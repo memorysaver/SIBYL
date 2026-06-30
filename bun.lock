@@ -28,15 +28,6 @@
         "sharp": "^0.34.5",
       },
     },
-    "apps/majestic-mass": {
-      "name": "majestic-mass",
-      "version": "0.0.1",
-      "dependencies": {
-        "@astrojs/starlight": "^0.41.1",
-        "astro": "^7.0.2",
-        "sharp": "^0.34.5",
-      },
-    },
     "apps/server": {
       "name": "server",
       "dependencies": {
@@ -1767,8 +1758,6 @@
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
     "magicast": ["magicast@0.5.3", "", { "dependencies": { "@babel/parser": "^7.29.3", "@babel/types": "^7.29.0", "source-map-js": "^1.2.1" } }, "sha512-pVKE4UdSQ7DvHzivsCIFx2BJn1mHG6KsyrFcaxFx6tONdneEuThrDx0Cj3AMg58KyN4pzYT+LHOotxDQDjNvkw=="],
-
-    "majestic-mass": ["majestic-mass@workspace:apps/majestic-mass"],
 
     "markdown-extensions": ["markdown-extensions@2.0.0", "", {}, "sha512-o5vL7aDWatOTX8LzaS1WMoaoxIiLRQJuIKKe2wAw6IeULDHaqbiqiggmx+pKvZDb1Sj+pE46Sn1T7lCqfFtg1Q=="],
 
