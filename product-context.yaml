@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 3
+dispatch_epoch: 4
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -300,12 +300,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-002-engine-seam"
     openspec_change: "SIBYL-002"
     started_at: "2026-06-30T10:28:53Z"
     dispatched_at_epoch: 3
+    completed_at: "2026-06-30T12:40:18Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/4"
+    merge_commit: "d0654f3"
     priority: critical
     business_value: 9
     complexity: M
@@ -340,7 +343,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 3
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-003-originate-drive"
+    openspec_change: "SIBYL-003"
+    started_at: "2026-06-30T12:40:18Z"
+    dispatched_at_epoch: 4
     priority: critical
     business_value: 9
     complexity: M
@@ -457,7 +465,12 @@ stories:
     calibration_type: null
     object_model_refs: ["product/maps/guided-aep-journey-tui/object-map.yaml#agent_run"]
     slice: 3
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-006-tui-shell"
+    openspec_change: "SIBYL-006"
+    started_at: "2026-06-30T12:40:18Z"
+    dispatched_at_epoch: 4
     priority: critical
     business_value: 8
     complexity: M
@@ -763,5 +776,19 @@ changelog:
       have no name field). Launched the post-001 frontier in parallel - SIBYL-002
       (engine seam), SIBYL-004 (git tool), SIBYL-005 (decision memory): all depend
       only on 001, disjoint files, no new deps. dispatch_epoch -> 3.
+    sections_changed:
+      - stories
+  - date: 2026-06-30
+    type: autopilot
+    author: human
+    summary: >
+      Ticks 5-7: transient API blip hit all 3 parallel workers mid-run (work intact
+      in worktrees); resumed from transcript -> all merged clean. SIBYL-004 (PR #2,
+      c59806e), SIBYL-005 (PR #3, beb9083), SIBYL-002 (PR #4, d0654f3) completed with
+      real tests vs Pi 0.80.2. Seam contract exported (EngineEvent/EngineCommand +
+      EngineRunCore injection point). 4/8 L0 done. Launched SIBYL-003 (originate drive)
+      + SIBYL-006 (TUI shell) in parallel - both unblocked by the seam, disjoint files.
+      dispatch_epoch -> 4. Learning banked: Pi resumability caveat (no sync flush
+      pre-dispose; session_start not auto-fired) for SIBYL-003/008.
     sections_changed:
       - stories
