@@ -847,3 +847,18 @@ changelog:
     sections_changed:
       - stories
       - layer_gates
+  - date: 2026-06-30
+    type: fix
+    author: human
+    summary: >
+      Closed an L0 gap surfaced at the human gate: the renderer (006) + modal form
+      (007) + live mount (008 mountOriginate) all existed, but NO CLI entry launched
+      the interactive TUI - the CLI only ran the headless path, so ADR-003's signature
+      modal-form UX was not actually reachable. Wired `sibyl originate --tui` (commit
+      6e4135d): runOriginateInteractive drives the live pi-tui TUI + persists the
+      human's decision; createPromptDrivenConnect makes it offline (README reflects
+      typed values, no model). 74 tests green, tsc clean, non-interactive path
+      unchanged. The interactive TTY surface is type-checked + human-run (not
+      CI-exercised); focus traversal + theming remain the L0.5 ux-flow calibration.
+    sections_changed:
+      - stories
