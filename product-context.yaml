@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 2
+dispatch_epoch: 3
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -257,12 +257,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-001-engine-bootstrap"
     openspec_change: "SIBYL-001"
     started_at: "2026-06-30T10:11:38Z"
     dispatched_at_epoch: 2
+    completed_at: "2026-06-30T10:28:53Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/1"
+    merge_commit: "cf5d908"
     priority: critical
     business_value: 8
     complexity: M
@@ -297,7 +300,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-002-engine-seam"
+    openspec_change: "SIBYL-002"
+    started_at: "2026-06-30T10:28:53Z"
+    dispatched_at_epoch: 3
     priority: critical
     business_value: 9
     complexity: M
@@ -366,8 +374,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: ready
+    status: in_progress
     readiness_score: 0.9
+    assigned_to: "sibyl-004-git-tool"
+    openspec_change: "SIBYL-004"
+    started_at: "2026-06-30T10:28:53Z"
+    dispatched_at_epoch: 3
     priority: high
     business_value: 7
     complexity: S
@@ -400,7 +412,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-005-decision-memory"
+    openspec_change: "SIBYL-005"
+    started_at: "2026-06-30T10:28:53Z"
+    dispatched_at_epoch: 3
     priority: high
     business_value: 7
     complexity: S
@@ -730,4 +747,15 @@ changelog:
       follows after 001 merges (both need the apps/harness scaffold). dispatch_epoch -> 2.
     sections_changed:
       - topology
+      - stories
+  - date: 2026-06-30
+    type: autopilot
+    author: human
+    summary: >
+      Tick 2: SIBYL-001 merged (PR #1, cf5d908) -> completed. Useful Pi API drift
+      captured (DefaultResourceLoader needs agentDir; loader.getSkills(); extensions
+      have no name field). Launched the post-001 frontier in parallel - SIBYL-002
+      (engine seam), SIBYL-004 (git tool), SIBYL-005 (decision memory): all depend
+      only on 001, disjoint files, no new deps. dispatch_epoch -> 3.
+    sections_changed:
       - stories
