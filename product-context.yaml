@@ -593,7 +593,7 @@ topology:
     concurrency_limit: 3
     conflict_detection: files_affected_overlap
     retry: "2x same agent -> failure analyst -> fresh agent -> human escalation"
-    autonomous: false
+    autonomous: true # enabled for /aep-autopilot; full_auto stays false so strategic gates (design, L0 layer gate, outcome eval) still pause for the human
     auto_design: false
     skip_human_eval: none
     full_auto: false
