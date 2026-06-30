@@ -1,0 +1,113 @@
+---
+name: e2e-test
+description: E2E testing for SIBYL — scripted gates (vitest), a declarative BDD journey dogfood driven by an agent (browser/device tool resolved per environment), and API drivers. Use when running tests, adding coverage, dogfooding a feature, running a user-story journey, seeding the test account, or executing the manual half of a layer gate.
+---
+
+# E2E Testing
+
+> **Policy first.** [`policy.md`](./policy.md) is the single source of truth for *which tiers gate a
+> layer*, *what to dogfood against* (`none` / `cli` / `local` / `deployed:<url>`), and *when*
+> (`pre-merge` / `post-deploy`). `/aep-build` and `/aep-wrap` read it. If a tier or the journey library is
+> absent from this skill, `policy.md` says why.
+
+Three tiers. Pick the one that matches the question being asked:
+
+| Tier               | Proves                                  | Where                                          |
+| ------------------ | --------------------------------------- | ---------------------------------------------- |
+| 1. Scripted gates  | the MACHINERY (deterministic, CI-able)  | `vitest` tests (project framework)     |
+| 2. Journey dogfood | the PRODUCT (real model/providers/env)  | [`journeys/`](./journeys/) (BDD user-story journeys) |
+| 3. API drivers     | backend state, bulk setup, async flows  | `.dev-workflow/dogfood-*.{mjs,*}` (gitignored)  |
+
+A green scripted gate is NOT proof the live product works — every layer gate has a manual journey half.
+Conversely, never debug machinery against a live environment — write a scripted test.
+
+## Tier 1 — Scripted gates (vitest)
+
+Owned by the project's test framework. Run during `/aep-build` Phase 4 with the project's test command.
+These cover deterministic machinery; they are not the dogfood.
+
+## Tier 2 — Journey dogfood (declarative BDD, agent-executed)
+
+The dogfood plan is a library of **natural-language, BDD-style user-story journeys** in
+[`journeys/`](./journeys/), one per capability area, covering the shipped surface layer by layer. A
+journey describes **intent** (Given / When / Then / **Verify**), **not** a click script — the executing
+agent translates each step into the right tool calls.
+
+**Which tool drives the UI is resolved by [`tool-selection.md`](./tool-selection.md)** — it picks the
+automation tool from the journey's `target` (web/mobile/desktop → browser/device; cli → bash), the host, and any pinned
+preference, with health probes and graceful degrade. Journeys themselves stay tool-agnostic.
+
+### Execution protocol (how an agent runs a journey)
+
+1. **Pick** a journey + scenario(s) from [`journeys/`](./journeys/).
+2. **Clean slate — seed the _target_ environment.** Run `scripts/seed.sh` against the **same** env the
+   journey runs on (from `policy.md` `dogfood_target`): `cli` → `bash scripts/seed.sh` (local fixtures /
+   temp dirs the binary reads); `local` → `bash scripts/seed.sh`; `deployed:<url>` →
+   `SERVER_URL=<url> bash scripts/seed.sh` (never seed local while dogfooding a deployed target — the
+   journey would verify against stale/absent fixtures). Where the product has a real sign-in, **auth is
+   browser-simulated** through the UI — not an API auto-login.
+3. **Read intent.** You are given Given/When/Then — *intent, not a recipe*. Translate each step into tool
+   calls using the tool from `tool-selection.md`.
+4. **Drive + verify.** Drive the surface with the resolved tool and assert observable state. For a UI
+   (`web`/`mobile`/`desktop`): drive with the browser/device tool, assert backend state via the API
+   (fresh element refs each step, scroll off-screen elements into view). For a `cli` target: run the built
+   binary via **bash** as a user would and assert **exit code / stdout / stderr / filesystem effects**.
+   Always **verify-state-before-claiming**.
+5. **Record + report.** Evidence per target — screenshots + API JSON for a UI; for a `cli` target the
+   captured **command + exit code + stdout/stderr + any filesystem diff**. Report **PASS/FAIL per `Then`**,
+   not "looks done". A `Verify` line that can't be confirmed is a FAIL.
+6. **Close coverage (build) / confirm it (gate).** Build the layer's coverage matrix — map each acceptance
+   criterion to the scenario `Verify` (or a Tier-1 case / Tier-3 API check) that proves it. **During
+   `/aep-build` (pre-merge):** for any **uncovered** criterion, author the missing scenario/case now and run
+   it; loop until every criterion is covered (or a `WAIVER: <reason>`). **At the `/aep-wrap` layer gate
+   (e.g. post-deploy execution):** you **execute and confirm only** — a missing journey or an uncovered
+   criterion is a COVERAGE FAILURE to surface (the gate stays `scripted_passed`), **never** authored at the
+   gate. One green journey is not coverage.
+
+### Layer gate (two-phase, covered)
+
+A layer gate is **two-phase**, and green means *covered* — not "one journey passed":
+
+- **`scripted_passed`** — the layer's Tier-1 framework tests are green (machinery proven).
+- **`passed`** — `scripted_passed` **+** the applicable journey / API tiers green **+** every layer
+  acceptance criterion proven (`coverage.criteria_covered == criteria_total`) **+** prior-layer journeys
+  replay green (regression).
+
+Run the matching journey and **confirm coverage** (step 6 — at the gate you execute and confirm; a missing
+journey or uncovered criterion is a COVERAGE FAILURE to surface, never authored here), and record evidence
+in `docs/layer-gates/<layer>.md` — the two matrices (**acceptance-traceability** + **scripted-coverage**),
+the checklist, and any `WAIVER:` lines. Copy
+[`layer-gate-evidence.template.md`](./layer-gate-evidence.template.md) per layer. `/aep-wrap` then
+performs the two-phase flip and asks the human before advancing. Bugs found route through `/aep-reflect` (bug →
+high-priority story; "works but feels wrong" → calibration). The full loop is in the
+`aep-e2e-skill-scaffolding` skill's `references/layer-gate-loop.md`.
+
+## Tier 3 — API drivers
+
+For backend verification and things browsers are slow at (async/streamed turns, bulk setup, state-tree
+diffs). Write `.dev-workflow/dogfood-<feature>.{mjs,…}`: sign in → call the API → assert. These are
+**gitignored throwaways** — reusable patterns belong in this SKILL.md, not the scripts.
+
+## Setup
+
+Source ports before running any test:
+
+```bash
+source .dev-workflow/ports.env    # BASE_URL=http://localhost:3001  SERVER_URL=http://localhost:3000
+```
+
+## Account reset & seed
+
+`scripts/seed.sh` converges the test account/database to a deterministic fixture via the public API
+(idempotent — safe to re-run). Run it before scenario dogfoods; stale or empty data hides bugs.
+
+```bash
+bash scripts/seed.sh                                  # local (reads .dev-workflow/ports.env)
+SERVER_URL=<prod-url> [SECRET=value …] bash scripts/seed.sh   # target a deployed env (prefix secret VAR=value assignments)
+```
+
+## Keeping this current
+
+When a feature ships or changes behavior, update the matching journey in
+[`journeys/`](./journeys/) in the same PR. A stale journey silently shrinks regression coverage. New
+capability → new journey (copy the template in [`journeys/README.md`](./journeys/README.md)).

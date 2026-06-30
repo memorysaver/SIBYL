@@ -1,0 +1,55 @@
+# Layer <N> gate — <layer title>
+
+> Evidence for `layer_gates[<N>]` in `product-context.yaml` (SIBYL). The gate is **two-phase**:
+> `scripted_passed` (Tier-1 framework tests green) → `passed` (all applicable tiers green **+** every
+> acceptance criterion proven **+** prior-layer journeys replay green). `/aep-wrap` reads this file before
+> flipping. Copy it to `docs/layer-gates/<layer>.md` per layer and fill the `<…>` placeholders.
+
+**Status:** `not_started` → `scripted_passed` → `passed`   ·   **Date:** <ISO8601>   ·   **Run by:** <agent/human>
+
+## Coverage summary
+
+- **Criteria proven:** `<criteria_covered>` / `<criteria_total>`
+- **Tiers (applicable only):** Tier-1 scripted `<PASS/FAIL>` · Tier-2 journey `<PASS/FAIL/N-A>` · Tier-3 API `<PASS/FAIL/N-A>`
+- **Regression:** prior-layer journeys replay `<PASS/FAIL/N-A>`
+
+## Acceptance traceability
+
+Every layer acceptance criterion needs a proving test. An empty "Proving test" cell = **uncovered** →
+auto-author the missing scenario/case during `/aep-build`, or record a `WAIVER:` below.
+
+| Acceptance criterion        | Proving test (journey scenario / scripted case / API check) | Verify (what confirms it)     | PASS/FAIL |
+| --------------------------- | ----------------------------------------------------------- | ----------------------------- | --------- |
+| `<criterion id / text>`     | Journey 0X · scenario 0X.1                                  | `<API resp / DB row / state>` | `<PASS>`  |
+| `<…>`                       | `<…>`                                                       | `<…>`                         | `<…>`     |
+
+## Scripted-coverage matrix (Tier-1)
+
+What the framework suite deterministically pins.
+
+| Case (test name)   | Asserts (invariant)         | PASS/FAIL |
+| ------------------ | --------------------------- | --------- |
+| `<test name>`      | `<invariant it pins>`       | `<PASS>`  |
+
+## Manual dogfood checklist (Tier-2/3)
+
+Run against the live environment; record evidence inline.
+
+- [ ] `<journey scenario / API check — with screenshot path + API JSON>`
+- [ ] `<…>`
+
+## Findings
+
+`<bugs / "feels wrong" observations → route via /aep-reflect; link the .dev-workflow/dogfood-*.md report>`
+
+## Waivers
+
+`<WAIVER: <criterion> — why it's deliberately not covered this layer, and when it will be>`
+_(none if every criterion is proven)_
+
+## Evidence
+
+- **Screenshots:** `<paths>`
+- **API JSON / logs:** `<paths or excerpts>`
+- **Scripted suite:** `<test file path(s)>` → `layer_gates[<N>].evidence.scripted`
+- **Journeys:** `<journey ids>` → `layer_gates[<N>].evidence.journeys`
