@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 1
+dispatch_epoch: 2
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -257,8 +257,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: ready
+    status: in_progress
     readiness_score: 0.9
+    assigned_to: "sibyl-001-engine-bootstrap"
+    openspec_change: "SIBYL-001"
+    started_at: "2026-06-30T10:11:38Z"
+    dispatched_at_epoch: 2
     priority: critical
     business_value: 8
     complexity: M
@@ -715,4 +719,15 @@ changelog:
       seed.sh skip the server wait for cli. L7 web surface gets its own deployed
       journey later; it does not gate the TUI layers.
     sections_changed:
+      - stories
+  - date: 2026-06-30
+    type: autopilot
+    author: human
+    summary: >
+      Autopilot started (goal: Layer 0 complete). Enabled topology.routing.autonomous
+      (full_auto stays false - strategic gates still pause). Tick 1 locked SIBYL-001
+      (engine bootstrap) -> in_progress and launched a worktree worker; SIBYL-004
+      follows after 001 merges (both need the apps/harness scaffold). dispatch_epoch -> 2.
+    sections_changed:
+      - topology
       - stories
