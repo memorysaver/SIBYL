@@ -676,6 +676,19 @@ topology:
       sources: []
       interval: 30m
       auto_create: false
+    process_learnings:
+      - pattern: "Background build workers hit transient API instability - mid-run 'connection closed' AND fresh-spawn returns with 0 tool-uses + garbled context-echo."
+        mitigation: "Treat a 0-tool/garbled/connection-closed return as an ORPHAN to resume (SendMessage to the agentId) - work is intact in the worktree - not a failure. All 8 L0 stories recovered with zero rework. Consider a post-spawn liveness probe + auto-resume."
+        discovered_at: 2026-06-30
+      - pattern: "`gh pr merge --delete-branch` from a worktree fails its local post-merge checkout because `main` is checked out in the primary worktree."
+        mitigation: "Cosmetic - the remote squash-merge + branch delete still succeed. Workers confirm the remote merge and delete the remote branch explicitly; don't treat the local-checkout error as a merge failure."
+        discovered_at: 2026-06-30
+      - pattern: "Fresh build worktrees had Pi deps in bun.lock but not installed - harness couldn't build/test until `bun install`."
+        mitigation: "Run `bun install` at the start of each worker (or in the launch/workspace-setup hook) before building."
+        discovered_at: 2026-06-30
+      - pattern: "L0 UI stories' acceptance criteria were satisfiable by the HEADLESS path (committed README + decision + scripted progress + no raw commands), so tests passed + auto-merged WITHOUT the interactive modal-form UI being launchable - ADR-003's signature UX slipped past the autopilot gate."
+        mitigation: "For UI stories, an acceptance criterion MUST require the interactive surface to be LAUNCHABLE + dogfooded (the Tier-2 journey drives the REAL UI), not just the headless controller logic. The human gate caught it; encode it as a criterion so the machine does too."
+        discovered_at: 2026-06-30
   handoffs:
     - from: implementer
       to: evaluator
@@ -862,3 +875,41 @@ changelog:
       CI-exercised); focus traversal + theming remain the L0.5 ux-flow calibration.
     sections_changed:
       - stories
+  - date: 2026-06-30
+    type: reflection
+    author: human
+    summary: "Layer 0 reflection - engine/seam hypothesis validated; the interactive modal-form UI gap was found at the human gate and closed (--tui)."
+    feedback:
+      bugs: []
+      refinements:
+        - description: "Interactive modal-form TUI entry was missing (CLI ran headless only) - ADR-003's signature UX was not reachable. Fixed inline."
+          story_id: "fixed-inline-6e4135d"
+          target_layer: 0
+          status: done
+      discoveries:
+        - description: "Pi resumability caveat (verified vs 0.80.2): disk SessionManager doesn't sync-flush a custom entry before dispose(); session_start doesn't auto-fire on bare createAgentSession. Restore = engine getEntries() read."
+          affected_section: architecture
+          for_layer: 5
+      calibration:
+        - description: "Modal-form focus traversal + theming are identity/placeholder - needs ux-flow calibration."
+          dimension: ux-flow
+          target_layer: 0.5
+      opportunity_shifts: []
+    outcome_evaluation:
+      layer: 0
+      hypothesis: "engine + renderer seam validated by driving a Pi agent through a guided modal-form task that writes a committed artifact + captures a decision"
+      metric: "task_completion_rate >= 80%"
+      assessment: >
+        Engine/seam hypothesis MET: the walking skeleton walks end-to-end (empty dir
+        -> committed README + >=1 decision, no raw commands); the renderer-agnostic
+        seam is verified by the smoke test; automated completion is deterministic (74
+        tests green vs real Pi 0.80.2). Functional criteria 1-2 proven in CI. Criterion
+        3 (the interactive modal-form UI drives the flow + live progress) was
+        HEADLESS-ONLY at the gate; now reachable via `sibyl originate --tui`
+        (type-checked + human-run, NOT CI-exercised) - pending the human's hands-on
+        confirmation before the gate flips to passed.
+      verdict: pending_human_handson
+    cost_observations: "8 worker runs (+ resumes after transient API blips); ~100-160k subagent tokens each. Startup-hiccup resumes added overhead but zero rework. No telemetry (qualitative L0)."
+    sections_changed:
+      - topology
+      - changelog
