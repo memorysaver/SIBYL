@@ -1,0 +1,278 @@
+# Inter-Agent Signals Specification
+
+The `.dev-workflow/signals/` directory provides file-based communication between the workspace agent and the main session. This follows Anthropic's pattern of agents communicating through files rather than chat.
+
+Anthropic's harness design research uses file-based communication between agents — one agent writes a file, another reads and responds by creating a new file or updating in place. This avoids the ambiguity of chat-based coordination and maintains structured context.
+
+**Source:** [Harness Design for Long-Running Application Development](https://www.anthropic.com/engineering/harness-design-long-running-apps)
+
+---
+
+## Directory Structure
+
+```
+.dev-workflow/signals/
+├── mode                     # /aep-launch writes — autonomy marker ("autopilot"); worker reads in Phase 12
+├── status.json              # Workspace agent writes — current phase and progress
+├── feedback.md              # Main session writes — mid-flight feedback
+├── ready-for-review.flag    # Workspace agent creates — signals human eval needed
+├── needs-human.md           # Workspace agent appends — human-gate record (decision needed)
+├── eval-request.md          # Generator writes — requests evaluator review
+└── eval-response-<N>.md     # Evaluator writes — evaluation results per round
+```
+
+---
+
+## Signal Files
+
+### `mode` — Autonomy Marker
+
+**Written by:** `/aep-launch` (orchestrator), at worktree creation
+**Read by:** Workspace agent (in Phase 12, and any merge-confirmation decision)
+**Format:** Single line — currently `autopilot`
+
+The presence of this file (value `autopilot`) means the worker was **launched
+autonomously** — there is no human at the worker's prompt to confirm a merge.
+It is the **source of truth** for the Phase 12 "Merge decision":
+
+- `mode` reads `autopilot` → **autopilot mode**: merge when Phase 12 conditions
+  pass; never stop at "PR ready" to ask for confirmation.
+- `mode` absent → **interactive mode**: a human is driving `/aep-build` directly;
+  ask for confirmation before merging.
+
+> **Staleness:** the marker has no launch-id/timestamp. Autopilot removes the
+> worktree on wrap, so a lingering `.feature-workspaces/<name>` with `mode=autopilot`
+> means a **crashed** run. A human who resumes the same `<name>` inherits its
+> autopilot mode (auto-merge) — remove the stale worktree first to build interactively.
+
+This marker is the **sole** mode signal — the worker must **not** infer mode from
+its cwd. The Phase 0 worktree guard relocates _every_ build (including an interactive
+one) into `.feature-workspaces/`, so "cwd under `.feature-workspaces/`" no longer
+distinguishes autonomous from interactive; and under Codex `codex-subagent`
+(`spawn_agent` has no cwd parameter) cwd is a soft contract anyway. The worker must
+**not** delete or overwrite `mode`; its own Phase 0 `mkdir -p .dev-workflow/signals`
+is idempotent and leaves this file intact.
+
+```bash
+# Worker — Phase 12 detection (anchored to the worktree root, not cwd):
+MODE=$(cat "$(git rev-parse --show-toplevel)/.dev-workflow/signals/mode" 2>/dev/null)
+```
+
+### `status.json` — Progress Signal
+
+**Written by:** Workspace agent (generator)
+**Read by:** Main session
+**Updated:** At the start of each phase and on blockers
+
+```json
+{
+  "phase": 4,
+  "phase_name": "implementing",
+  "task_current": "Add user login form",
+  "task_index": 2,
+  "task_total": 5,
+  "started_at": "2026-03-25T10:00:00Z",
+  "blockers": [],
+  "completion_pct": 40,
+  "last_updated": "2026-03-25T11:30:00Z"
+}
+```
+
+**Fields:**
+
+| Field            | Type         | Description                                                                                                                                     |
+| ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phase`          | number       | Current phase number (0–13)                                                                                                                     |
+| `phase_name`     | string       | Human-readable phase name                                                                                                                       |
+| `task_current`   | string       | Current task being worked on (Phase 4 only)                                                                                                     |
+| `task_index`     | number       | 1-based index of current task                                                                                                                   |
+| `task_total`     | number       | Total number of tasks                                                                                                                           |
+| `started_at`     | string       | ISO 8601 timestamp of phase start                                                                                                               |
+| `blockers`       | string[]     | List of blockers preventing progress                                                                                                            |
+| `completion_pct` | number       | Estimated completion percentage (0–100)                                                                                                         |
+| `last_updated`   | string       | ISO 8601 timestamp of last update                                                                                                               |
+| `story_status`   | string       | Story state for `/aep-dispatch` sync: `"in_progress"`, `"in_review"`, `"completed"`, `"failed"`                                                 |
+| `pr_url`         | string       | PR URL once created (Phase 10+)                                                                                                                 |
+| `cost_usd`       | number       | Accumulated cost estimate for this story                                                                                                        |
+| `completed_at`   | string       | ISO 8601 timestamp when story completed (Phase 12)                                                                                              |
+| `failure_log`    | object       | Structured failure record (Phase 12 failure only) — `error_class`, `approach_summary`, `failure_point`, `root_cause`, `unexplored_alternatives` |
+| `blocked_on`     | string\|null | `"human"` while the worker waits on a human decision (paired with a `needs-human.md` entry); null otherwise                                     |
+
+> **Concurrency protocol:** These story-tracking fields replace direct writes to `product-context.yaml`. The main session (via `/aep-wrap` and `/aep-dispatch` signal sync) reads these fields and updates the YAML. Workspace agents must never write to `product-context.yaml`.
+
+**Update points:**
+
+- Phase 0: After initialization completes
+- Phase 4: At start of each task and on completion
+- Phase 5–8: At start and completion of each phase
+- Phase 9–12: At each sub-step (push, PR create, merge)
+- On blockers: Add to `blockers` array immediately
+
+### `feedback.md` — Main Session Feedback
+
+**Written by:** Main session (user or main agent)
+**Read by:** Workspace agent
+**Format:** Append-only markdown
+
+```markdown
+# Feedback
+
+## 2026-03-25 11:45
+
+Priority: high
+Focus on the auth flow first — the settings page can wait until a follow-up PR.
+
+## 2026-03-25 14:20
+
+Priority: low
+The button colors look off on dark mode. Not blocking.
+```
+
+**Rules:**
+
+- Main session appends new entries with timestamp and priority
+- Workspace agent checks for new feedback at the start of each phase
+- High-priority feedback should be addressed before continuing
+- Low-priority feedback can be deferred to Phase 11.5
+
+### `ready-for-review.flag` — Review Signal
+
+**Created by:** Workspace agent
+**Read by:** Main session
+**Format:** Empty file or single-line description
+
+The workspace agent creates this file when it reaches Phase 11.5 (human evaluation) to signal that the feature is ready for human testing.
+
+```bash
+# Workspace agent creates:
+echo "Feature ready for testing at http://localhost:3000" > .dev-workflow/signals/ready-for-review.flag
+```
+
+The main session can watch for this file:
+
+```bash
+# Main session polls (or uses filesystem watcher):
+cat .feature-workspaces/<name>/.dev-workflow/signals/ready-for-review.flag
+```
+
+### `needs-human.md` — Human-Gate Record
+
+**Written by:** Workspace agent (append-only)
+**Read by:** Main session / autopilot (which surfaces it as an escalation)
+**Created:** Whenever the worker hits a decision only the human can make
+
+```markdown
+## 2026-06-10T14:30:00Z — Phase 5 (eval round 4)
+
+**Question:** Eval keeps failing Security on the token storage approach. Options: (a) httpOnly cookie, (b) encrypted localStorage. Spec is silent.
+**Context:** Both pass functional criteria; the choice affects the API contract.
+resolved: human chose (a) httpOnly cookie — 2026-06-10T15:02:00Z
+```
+
+**Rules:**
+
+- Pair every entry with `"blocked_on": "human"` in `status.json`; clear it and
+  append a `resolved:` line after acting on the answer.
+- The file is the host-agnostic record; the question is answered
+  **hub-and-spoke in the main session** and relayed per launch mode (bg subagent
+  `SendMessage(to: agentId)`, session resume, `send_input`, `codex exec resume`, nudge) —
+  see the Human-Gate Protocol in `aep-executor/references/backends.md`.
+- **Gate-and-park** (native-bg-subagent / workflow / headless / codex-exec / claude-bg): after
+  recording the gate the worker commits WIP and **ends its run cleanly**; the
+  orchestrator later resumes a worker into the same worktree with the answer.
+  A parked worker's exited process is expected — not a crash.
+- Orchestrators treat a gated workspace as **waiting, not stuck and not
+  failed**.
+
+### `eval-request.md` — Evaluation Request
+
+**Written by:** Generator agent
+**Read by:** Evaluator agent
+**Created:** When generator completes Phase 4 and is ready for evaluation
+
+```markdown
+# Evaluation Request
+
+**Round:** 1
+**Date:** 2026-03-25
+**Requested by:** generator
+
+## What to evaluate
+
+- All tasks committed on the feature branch
+- Dev server running on port 3000 (web) / 3001 (server)
+
+## Changes since last round
+
+- [First evaluation — all changes are new]
+
+## Known issues
+
+- [Any issues the generator is already aware of]
+
+## Files changed
+
+[Output of git diff --stat "$BASE"...HEAD (integration branch; see git-ref)]
+```
+
+### `eval-response-<N>.md` — Evaluation Response
+
+**Written by:** Evaluator agent
+**Read by:** Generator agent
+**Format:** Follows the structure defined in `evaluator-criteria.md`
+
+See the "Evaluation Protocol" section in `evaluator-criteria.md` for the response format.
+
+---
+
+## Reading Signals from Main Session
+
+The main session can check workspace progress without interrupting the agent:
+
+```bash
+# Check current phase and progress
+cat .feature-workspaces/<name>/.dev-workflow/signals/status.json | jq .
+
+# Check if ready for review
+ls .feature-workspaces/<name>/.dev-workflow/signals/ready-for-review.flag 2>/dev/null
+
+# Send feedback
+cat >> .feature-workspaces/<name>/.dev-workflow/signals/feedback.md << 'EOF'
+
+## 2026-03-25 14:00
+Priority: high
+The API response format changed — check the latest main for updates.
+EOF
+```
+
+---
+
+## Signal Polling
+
+Agents should check for signal files **at phase boundaries**, not continuously:
+
+- **Generator** checks `feedback.md` at the start of each new phase
+- **Evaluator** checks `eval-request.md` after completing its bootstrap (initial read of specs/contracts) and after writing each eval-response
+- **Main session** checks `status.json` and `ready-for-review.flag` when the user wants a progress update
+
+There is no filesystem watcher or continuous polling. Agents read signal files at natural transition points in the workflow.
+
+If a signal file doesn't exist yet, skip it and continue — it will be checked again at the next phase boundary.
+
+---
+
+## Lifecycle
+
+1. **Phase 0:** Create `.dev-workflow/signals/` directory, initialize `status.json`
+2. **Each phase:** Update `status.json` at start and end
+3. **Phase 4:** Update `task_current`, `task_index` as tasks progress
+4. **Phase 5:** Generator creates `eval-request.md` if evaluator is running
+5. **Phase 5:** Evaluator writes `eval-response-<N>.md`
+6. **Phase 10:** Set `story_status: "in_review"` and `pr_url` in `status.json`
+7. **Phase 11.5:** Create `ready-for-review.flag`
+8. **Phase 12:** Set `story_status: "completed"`, `completed_at`, `cost_usd` in `status.json`
+9. **On failure:** Set `story_status: "failed"` and populate `failure_log` in `status.json`
+10. **On blockers:** Update `status.json` blockers immediately
+11. **On feedback:** Check `feedback.md` at start of each phase
+
+> **Main session reads these signals** via `/aep-dispatch` (signal sync step) and `/aep-wrap` (post-merge step) to update `product-context.yaml`. Workspace agents never write to the YAML directly.
