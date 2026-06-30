@@ -520,7 +520,7 @@ stories:
       contract_tests_required: false
     files_affected:
       - "apps/harness/src/main.ts"
-    technical_notes: "This story IS the L0 layer-gate journey (Tier-2). e2e target should be cli (TUI), not the web/deployed policy set during scaffold - reconcile via /aep-e2e-skill-scaffolding."
+    technical_notes: "This story IS the L0 layer-gate journey (Tier-2). e2e policy reconciled: target cli (built harness binary via bash), tiers [1,2], pre-merge - see skills/e2e-test/policy.md + journeys/00-walking-skeleton.md."
     verification:
       unit: []
       integration: ["empty dir -> committed README + >=1 decision, no manual commands"]
@@ -701,5 +701,18 @@ changelog:
       tool) have no dependencies -> transitioned pending->ready (Layer 0, Wave 1).
       Both readiness 0.9 (launch-ready). Scored the queue; dispatch lock held
       pending human go on starting the L0 build. dispatch_epoch -> 1.
+    sections_changed:
+      - stories
+  - date: 2026-06-30
+    type: e2e_policy
+    author: human
+    summary: >
+      E2E policy reconciled to the actual product (the Pi TUI harness, not the
+      scaffolded web app): dogfood_target deployed:<cloudflare-url> -> cli, tiers
+      [1,2,3] -> [1,2], timing post-deploy -> pre-merge. Retargeted
+      skills/e2e-test/policy.md + journeys/00-walking-skeleton.md (web GET /health
+      -> bash CLI run: empty dir -> committed README + >=1 decision) and made
+      seed.sh skip the server wait for cli. L7 web surface gets its own deployed
+      journey later; it does not gate the TUI layers.
     sections_changed:
       - stories

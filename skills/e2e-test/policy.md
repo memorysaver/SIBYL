@@ -10,16 +10,16 @@ and Pi all read this same file — that is what keeps behavior consistent across
 
 | Decision             | This project              |
 | -------------------- | ------------------------- |
-| **Applicable tiers** | [1, 2, 3]                 |
-| **Dogfood target**   | deployed:<cloudflare-url> |
-| **Journey timing**   | post-deploy               |
+| **Applicable tiers** | [1, 2]                    |
+| **Dogfood target**   | cli                       |
+| **Journey timing**   | pre-merge                 |
 
-> **⚠ Fill in the deployment URL.** `dogfood_target` is `deployed:<cloudflare-url>` — a placeholder. Run
-> `bun run deploy` (Alchemy → Cloudflare) to provision the Workers/Pages deployment, then replace
-> `<cloudflare-url>` above with the real web URL (e.g. `https://sibyl-web.<account>.workers.dev`). Until
-> then, layer merges sit at `scripted_passed` and the journey half cannot execute. To dogfood locally in
-> the interim, temporarily set `dogfood_target: local` + `journey_timing: pre-merge` (or re-run the
-> scaffolding skill).
+> **Why `cli`.** SIBYL's product is the **Pi-based TUI harness** (`apps/harness`), a command-line program —
+> not the scaffolded Better-T-Stack web app. The Tier-2 journey dogfoods the **built harness binary via
+> bash** (drive it as a user would; assert exit code / stdout / filesystem), with **no dev server and no
+> deployed URL**, and runs **pre-merge** in `/aep-build` Phase 6. The Cloudflare web surface is a later
+> layer (L7 web observer); when it ships, add a `deployed:<url>` web journey then — it does not gate the
+> TUI layers.
 
 - **Applicable tiers** — only these tiers gate a layer (its `passed` needs them green + every acceptance
   criterion proven). A **CLI** is `1 + 2` (Tier-2 journey is **bash-driven** — run the built binary, assert
@@ -30,10 +30,10 @@ and Pi all read this same file — that is what keeps behavior consistent across
 - **Dogfood target** — what/where the Tier-2 journeys run against:
   - `cli` — the built **command-line binary**, driven by **bash** (run it as a user would; assert exit
     code / stdout / stderr / filesystem). No URL, no server — pre-merge/local. An agent invoking the CLI
-    is the same as a human typing it, so the journey is a faithful dogfood.
+    is the same as a human typing it, so the journey is a faithful dogfood. **← this project**
   - `local` — against the local dev server (`$BASE_URL` from `.dev-workflow/ports.env`), pre-merge.
   - `deployed:<url>` — against a deployed environment (e.g. a Cloudflare prod/preview URL), typically
-    after merge → deploy. **← this project**
+    after merge → deploy.
   - `none` — **no runnable surface at all** (pure config / schema / docs repo). Tier-2 is **N/A**; a
     layer's gate is Tier-1 (+ Tier-3) + coverage. No journey, no `journeys/` dir.
 - **Journey timing** — governs **only when the journey is EXECUTED**, never when it is authored. The
@@ -60,8 +60,9 @@ journey_timing   : pre-merge | post-deploy                # when the journey hal
   surface and every criterion is proven via Tier-1 / Tier-3). Step B then executes it: resolve the target
   from `dogfood_target` (`cli` → run the built binary via **bash**, no URL; `local` → `$BASE_URL`;
   `deployed:<url>` → that URL) and run the journey with the tool from
-  [`tool-selection.md`](./tool-selection.md). With `journey_timing: post-deploy` (this project), Step A still
-  authors + commits the journey now; only Step B's execution is deferred to the layer gate.
+  [`tool-selection.md`](./tool-selection.md). With `journey_timing: pre-merge` (this project), Step A authors
+  + commits the journey **and** Step B executes it in the same `/aep-build` Phase 6 — against the built `cli`
+  binary via bash (no server, no deploy).
 - **`/aep-wrap` layer gate** — runs only the **applicable tiers**; with `journey_timing: post-deploy` it
   executes the journey against the `deployed:<url>` target after the merge/deploy, then flips
   `scripted_passed → passed`. It **executes, never authors** — **when Tier-2 is an applicable tier**

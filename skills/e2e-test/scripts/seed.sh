@@ -18,15 +18,20 @@ fi
 # An explicitly passed SERVER_URL wins over ports.env (deployed-env targeting).
 SERVER_URL="${EXPLICIT_SERVER_URL:-${SERVER_URL:-http://localhost:3000}}"
 
-# Wait briefly for the server — best-effort. Seeding is a no-op on a fresh project with no server yet,
-# so don't block: a short bounded wait, then continue regardless.
-echo "Waiting for server at $SERVER_URL..."
-up=false
-for _ in $(seq 1 10); do
-  curl -s "$SERVER_URL" >/dev/null 2>&1 && { up=true; break; }
-  sleep 1
-done
-[ "$up" = true ] || echo "  server not reachable — continuing (best-effort seed)"
+# Wait briefly for the server — best-effort, and ONLY when a server target is configured.
+# This is a cli project (dogfood_target: cli) with no server, so skip the wait unless a SERVER_URL
+# or .dev-workflow/ports.env is explicitly present (e.g. once an L7 web surface ships).
+if [ -n "$EXPLICIT_SERVER_URL" ] || [ -f "$REPO_ROOT/.dev-workflow/ports.env" ]; then
+  echo "Waiting for server at $SERVER_URL..."
+  up=false
+  for _ in $(seq 1 10); do
+    curl -s "$SERVER_URL" >/dev/null 2>&1 && { up=true; break; }
+    sleep 1
+  done
+  [ "$up" = true ] || echo "  server not reachable — continuing (best-effort seed)"
+else
+  echo "No server target (cli project) — skipping server wait."
+fi
 
 # ── PROJECT-SPECIFIC: DB migrations ──
 # e.g.  bun run db:migrate
