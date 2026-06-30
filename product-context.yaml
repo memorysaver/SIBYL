@@ -1,16 +1,15 @@
 schema: v1
 project: SIBYL
-version: "0.1.0"
+version: "0.2.0"
 updated_at: 2026-06-30
 dispatch_epoch: 0
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
-# The stable product definition lives in product/index.yaml
+# Stable product definition lives in product/index.yaml
 # (opportunity + personas + capabilities + product). This file holds
-# OPERATIONAL state only. architecture / stories / topology / layer_gates /
-# waves / cost are populated by /aep-map.
+# OPERATIONAL state: architecture, stories, waves, topology, layer_gates, cost.
 
-# ─── CALIBRATION (Phase 1) ───────────────────────────────────────
+# ─── CALIBRATION ─────────────────────────────────────────────────
 calibration:
   plan:
     - layer: 0.5
@@ -21,27 +20,654 @@ calibration:
       trigger: "While driving envision - confirm product scope / direction as it sharpens."
     - layer: 3
       dimensions: ["object-model"]
-      trigger: "Before building the story-mapping UI - auto-draft and human-approve the noun-first Object Map."
+      trigger: "Before building the story-mapping UI - auto-draft and human-approve the noun-first Object Map for the story-map objects (Story/Layer/Gate/Journey)."
   history: []
+
+# ─── ARCHITECTURE (System Map) ───────────────────────────────────
+architecture:
+  style: "Modular TUI harness - a host-agnostic engine + a swappable renderer, embedding the Pi coding-agent SDK."
+  overview: >
+    SIBYL drives a Pi agent through guided AEP tasks and renders its own TUI. The
+    load-bearing boundary is the engine<->renderer seam: the engine owns the Pi
+    AgentSession, the run/phase state machine, tool gating, and decision capture,
+    and emits a structured event + decision-request stream; the renderer consumes
+    that stream and owns all pi-tui UI (modal-form mode for L0, story-map mode
+    later). Keeping them apart makes the L7 web surface a new renderer, not a rewrite.
+  technical_spec: null # protocol_sequences below cover the seam; full docs/technical-spec.md graduates at L3 (story-map mode)
+  modules:
+    - name: engine
+      kind: backend
+      responsibility: "Host-agnostic orchestration core: owns the Pi AgentSession, the run/phase state machine, tool gating, skill/task driving, and decides what to capture as decision-memory; emits the structured event/decision-request stream."
+      does_not: "Render anything, know about terminals/pi-tui, hard-code a renderer, or talk to the model directly (Pi does)."
+      owns:
+        - "the Pi AgentSession lifecycle"
+        - "run/phase state machine"
+        - "the engine<->renderer protocol (EngineEvent / EngineCommand)"
+      depends_on:
+        - tools
+        - memory
+      technology: null
+      key_concepts:
+        - "ExtensionFactory (SIBYL engine-extension), createAgentSession, session.subscribe"
+        - "EngineEvent: phase_changed | progress | form_requested | decision_requested | run_completed | run_failed"
+        - "EngineCommand: start_run | submit_form | submit_decision | abort"
+        - "tool gating via setActiveTools (read-only -> +git)"
+    - name: renderer
+      kind: ui
+      responsibility: "The TUI. Consumes EngineEvents; renders the UI-mode state machine (form-mode -> story-map-mode later); collects form input + decisions; streams live progress."
+      does_not: "Call the Pi SDK, orchestrate the agent, persist decisions, or make workflow decisions."
+      owns:
+        - "all pi-tui components"
+        - "UI / mode state machine"
+        - "input + progress widgets"
+      depends_on:
+        - engine
+      technology: "@earendil-works/pi-tui"
+      key_concepts:
+        - "modal form (ctx.ui.custom / pi-tui components), NOT a chat transcript"
+        - "live progress from progress events (tool activity + streaming text)"
+    - name: tools
+      kind: backend
+      responsibility: "SIBYL-owned narrow agent tools the engine exposes to Pi - v0: a git tool (init/add/commit). The trust boundary (what the agent may run)."
+      does_not: "Decide orchestration or run arbitrary bash."
+      owns:
+        - "the allowed command surface (narrow git tool; later gh, scoped fs writes)"
+      depends_on: []
+      technology: null
+      key_concepts:
+        - "defineTool - narrow git tool instead of full bash"
+    - name: memory
+      kind: shared
+      responsibility: "Persist / recall decision entries. v0: thin pass-through to pi.appendEntry / getEntries. L5: pluggable backend (mgrep / MITS)."
+      does_not: "Decide WHAT to capture (engine does), or render."
+      owns:
+        - "the decision-entry record + (future) backend adapter"
+      depends_on: []
+      technology: null
+      key_concepts:
+        - "appendDecision / recallDecisions over pi.appendEntry (no abstraction in v0)"
+  domain_model:
+    - name: DecisionEntry
+      purpose: "A captured human decision during a run (the decision-memory primitive)."
+      fields:
+        - name: id
+          type: string
+          default: null
+          required: true
+          notes: "Stable id; from the session entry."
+        - name: phase
+          type: string
+          default: null
+          required: true
+          notes: "Run phase the decision was made in (e.g. originate)."
+        - name: decision
+          type: string
+          default: null
+          required: true
+          notes: "The choice the human made."
+        - name: at
+          type: number
+          default: null
+          required: true
+          notes: "Timestamp (passed in; Date.now is not used in pure logic)."
+      invariants:
+        - "Persisted via pi.appendEntry and excluded from the LLM context."
+  protocol_sequences:
+    - name: originate-run
+      participants: ["renderer", "engine"]
+      trigger: "User launches SIBYL in an empty dir and starts a run."
+      steps:
+        - sender: renderer
+          message_type: "start_run"
+          timeout_ms: null
+          payload_example: '{"type":"start_run","cwd":"/abs/empty"}'
+        - sender: engine
+          message_type: "form_requested"
+          timeout_ms: null
+          payload_example: '{"type":"form_requested","schema":{"fields":["product","problem","vision"]}}'
+        - sender: renderer
+          message_type: "submit_form"
+          timeout_ms: null
+          payload_example: '{"type":"submit_form","values":{"product":"...","problem":"...","vision":"..."}}'
+        - sender: engine
+          message_type: "progress"
+          timeout_ms: null
+          payload_example: '{"type":"progress","kind":"tool_execution|message_update","detail":"..."}'
+        - sender: engine
+          message_type: "decision_requested"
+          timeout_ms: null
+          payload_example: '{"type":"decision_requested","prompt":"Commit this README?","options":["Commit","Revise","Cancel"]}'
+        - sender: renderer
+          message_type: "submit_decision"
+          timeout_ms: null
+          payload_example: '{"type":"submit_decision","choice":"Commit"}'
+        - sender: engine
+          message_type: "run_completed"
+          timeout_ms: null
+          payload_example: '{"type":"run_completed","artifacts":["README.md"],"decisions":1}'
+      error_behavior: "Any step failing emits run_failed{class, detail}; git step aborts before commit (no partial repo)."
+      timeout_behavior: "No hard timeout in v0; the user may abort (EngineCommand abort) at any step."
+  interfaces:
+    - from: renderer
+      to: engine
+      protocol: "in-process function call / event"
+      endpoint: "engine.dispatch(command: EngineCommand)"
+      request: {}
+      response: {}
+      errors:
+        - code: 0
+          meaning: "run_failed event carries {class, detail}"
+      sla: null
+    - from: engine
+      to: renderer
+      protocol: "in-process event stream"
+      endpoint: "engine.subscribe(listener: (e: EngineEvent) => void)"
+      request: {}
+      response: {}
+      errors: []
+      sla: null
+    - from: engine
+      to: tools
+      protocol: "function call (Pi tool invocation)"
+      endpoint: "git(args) -> {exitCode, stdout, stderr}"
+      request: {}
+      response: {}
+      errors:
+        - code: 1
+          meaning: "non-zero git exit; engine aborts before commit"
+      sla: null
+    - from: engine
+      to: memory
+      protocol: "function call"
+      endpoint: "appendDecision(entry) / recallDecisions()"
+      request: {}
+      response: {}
+      errors: []
+      sla: null
+    - from: engine
+      to: pi-sdk
+      protocol: "library (SDK)"
+      endpoint: "createAgentSession / session.prompt / session.subscribe"
+      request: {}
+      response: {}
+      errors: []
+      sla: null
+  data_flows:
+    - journey: "Originate (L0 walking skeleton)"
+      path: "renderer(start_run) -> engine(createAgentSession + gate tools) -> engine(form_requested) -> renderer(modal form) -> engine(prompt imagine->README) -> Pi -> engine(progress) -> renderer(stream) -> engine(decision_requested) -> renderer -> engine(memory.appendDecision + tools.git init/commit) -> engine(run_completed)"
+  third_party:
+    - name: "Pi (@earendil-works/pi-*@0.80.2)"
+      provides: "agent SDK, pi-tui, extension system, /skill: discovery"
+      integration_point: "engine (SDK) + renderer (pi-tui)"
+      failure_mode: "hard fail (substrate); plan-mode vendored from pinned tag + drift smoke test"
+    - name: "git CLI"
+      provides: "repo init + commit"
+      integration_point: "tools (narrow git tool)"
+      failure_mode: "abort before commit; no partial repo"
+    - name: "model API"
+      provides: "the reasoning agent"
+      integration_point: "engine -> Pi"
+      failure_mode: "run_failed; resumable from decision log"
+  deployment:
+    environments: ["local"]
+    module_runtime: { "engine": "node-22.19", "renderer": "node-22.19", "tools": "node-22.19", "memory": "node-22.19" }
+    persistence: { "decisions": "pi-session (appendEntry)" }
+  amendment_log: []
+  adrs:
+    - id: ADR-001
+      title: "Engine<->renderer seam"
+      context: "The TUI must become a non-chat modal form now and a web surface later without a rewrite."
+      decision: "A host-agnostic engine emits structured EngineEvents / accepts EngineCommands; the renderer is one consumer. No ctx.ui call may live in orchestration."
+      reasoning: "Decouples orchestration from presentation; the L7 web surface is a new renderer."
+      consequences: "Enables swappable renderers; costs a defined protocol + a renderer-agnostic smoke test in v0."
+    - id: ADR-002
+      title: "Build on Pi, never fork"
+      context: "Pi provides the agent SDK + TUI lib + extension system."
+      decision: "Embed @earendil-works/pi-coding-agent + pi-tui @0.80.2; vendor plan-mode/subagent EXAMPLES from the pinned tag behind a thin adapter."
+      reasoning: "Honors the manifesto ('without forking Pi internals'); tracks AEP-leads-SIBYL-follows."
+      consequences: "Coupled to Pi's extension API (v0.x) - mitigated by the adapter + drift smoke test; pinned 0.80.2."
+    - id: ADR-003
+      title: "Custom-rendered modal-form TUI (not Pi InteractiveMode chat)"
+      context: "The product wants a structured, non-chat origination UX that converts to a story-map."
+      decision: "SIBYL renders its own pi-tui UI from v0 (Y path), not Pi's chat InteractiveMode."
+      reasoning: "A form is more observable/deterministic than chat and is the product identity."
+      consequences: "More UI work in v0; justifies the L0.5 ux-flow calibration."
+
+# ─── STORIES (Layer 0 - Originate walking skeleton) ──────────────
+stories:
+  - id: SIBYL-001
+    title: "Engine bootstrap - embed Pi SDK + bind SIBYL engine-extension"
+    layer: 0
+    module: engine
+    activity: null
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 1
+    status: pending
+    priority: critical
+    business_value: 8
+    complexity: M
+    compile_mode: shared_enabler
+    change_group: null
+    dependencies: []
+    description:
+      what_changes: "A new apps/harness package boots a Pi AgentSession (DefaultResourceLoader with the SIBYL engine-extension factory, SessionManager) for a given cwd; skills from .agents/skills are discoverable."
+      why: "Foundation for every later layer; proves SDK boot + extension load + skill discovery (Context Document constraints)."
+    acceptance_criteria:
+      - "apps/harness builds and runs under Node 22.19 with @earendil-works/pi-coding-agent@0.80.2 (out of the shared catalog)."
+      - "createAgentSession returns a session bound to the SIBYL engine-extension via extensionFactories."
+      - "A discovery check confirms aep-* skills resolve from .agents/skills."
+    interface_obligations:
+      implements: []
+      consumes: ["engine -> pi-sdk"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/package.json"
+      - "apps/harness/src/engine/session.ts"
+    technical_notes: "Pin Node 22.19 + TS 5.9.x / @types/node 22.19; exclude apps/harness from the Bun catalog. Verify pi-tui runs under the chosen runtime before committing to Bun."
+    verification:
+      unit: ["session factory returns a bound session"]
+      integration: ["skill discovery finds aep-envision"]
+      contract: []
+  - id: SIBYL-002
+    title: "Engine seam - EngineEvent/EngineCommand + run/phase state machine"
+    layer: 0
+    module: engine
+    activity: null
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 2
+    status: pending
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: shared_enabler
+    change_group: null
+    dependencies: ["SIBYL-001"]
+    description:
+      what_changes: "The engine exposes dispatch(EngineCommand) and subscribe(EngineEvent) and runs a run/phase state machine; orchestration emits structured events with NO pi-tui/ctx.ui references."
+      why: "The load-bearing engine<->renderer seam (ADR-001); makes the renderer swappable and the L7 web surface a new consumer."
+    acceptance_criteria:
+      - "EngineEvent and EngineCommand types are defined and exported."
+      - "A renderer-agnostic smoke test drives a full originate run via the seam with NO ctx.ui import in the engine."
+      - "Run/phase transitions (idle->form->running->decision->done/failed) are enforced."
+    interface_obligations:
+      implements: ["renderer<->engine seam (EngineEvent/EngineCommand)"]
+      consumes: []
+      contract_tests_required: true
+    files_affected:
+      - "apps/harness/src/engine/seam.ts"
+      - "apps/harness/src/engine/state-machine.ts"
+    technical_notes: "Adapt the plan-mode example's hook structure (vendored @0.80.2) but expose results as events, not ui calls."
+    verification:
+      unit: ["state machine transition table"]
+      integration: ["seam smoke test, headless"]
+      contract: ["EngineEvent/EngineCommand schema conformance"]
+  - id: SIBYL-003
+    title: "Drive imagine->README task through Pi + map progress events"
+    layer: 0
+    module: engine
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 3
+    status: pending
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-002", "SIBYL-004"]
+    description:
+      what_changes: "On submit_form, the engine prompts the agent (seeded with the form values) to run an imagine pass and write README.md, gating tools read-only+git; tool_execution_* / message_update are mapped to progress EngineEvents; at completion it requests the commit decision."
+      why: "The originate flow's agent-driven core - proves SIBYL conducts a Pi agent through a guided task."
+    acceptance_criteria:
+      - "submit_form triggers a prompt that produces a README.md draft in the cwd."
+      - "tool_execution_* and message_update are surfaced as progress events."
+      - "On completion the engine emits decision_requested for the commit gate."
+    interface_obligations:
+      implements: ["engine -> renderer (progress, decision_requested)"]
+      consumes: ["engine -> pi-sdk", "engine -> tools"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/originate.ts"
+    technical_notes: "v0 drives a GENERIC guided task (no packaged AEP skill); the /skill: path is first proven at L1 (scaffold)."
+    verification:
+      unit: ["progress mapping from AgentEvent"]
+      integration: ["form values -> README draft"]
+      contract: []
+  - id: SIBYL-004
+    title: "Narrow git tool (init/add/commit)"
+    layer: 0
+    module: tools
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 1
+    status: pending
+    priority: high
+    business_value: 7
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: []
+    description:
+      what_changes: "A defineTool-based narrow git tool exposing init, add, commit (no arbitrary bash), returning {exitCode, stdout, stderr}."
+      why: "The trust boundary from the security model; enables the originate commit deterministically."
+    acceptance_criteria:
+      - "git(init/add/commit) runs against a temp dir and returns structured results."
+      - "The tool refuses commands outside its allowlist."
+    interface_obligations:
+      implements: ["engine -> tools (git)"]
+      consumes: ["tools -> git (third-party)"]
+      contract_tests_required: true
+    files_affected:
+      - "apps/harness/src/tools/git.ts"
+    technical_notes: "setActiveTools gates at tool granularity; the narrow tool keeps the surface small (no full bash)."
+    verification:
+      unit: ["allowlist enforcement"]
+      integration: ["init+add+commit on a temp repo"]
+      contract: ["git tool result schema"]
+  - id: SIBYL-005
+    title: "Decision-memory pass-through (appendDecision/recallDecisions)"
+    layer: 0
+    module: memory
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 2
+    status: pending
+    priority: high
+    business_value: 7
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-001"]
+    description:
+      what_changes: "memory.appendDecision(entry) wraps pi.appendEntry('sibyl-decision', ...) and recallDecisions() reads session entries; NO abstraction layer."
+      why: "Captures the >=1 decision-memory entry the L0 success criterion requires; names the L5 swap seam without premature abstraction."
+    acceptance_criteria:
+      - "appendDecision persists a DecisionEntry via pi.appendEntry."
+      - "recallDecisions returns prior entries on session_start."
+      - "Entries are excluded from the LLM context."
+    interface_obligations:
+      implements: ["engine -> memory"]
+      consumes: []
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/memory/decisions.ts"
+    technical_notes: "Two functions only - no MemoryEntry interface/module until L5."
+    verification:
+      unit: ["append then recall round-trips"]
+      integration: ["decision survives session_start restore"]
+      contract: []
+  - id: SIBYL-006
+    title: "TUI shell + UI-mode state machine (form-mode) + progress render"
+    layer: 0
+    module: renderer
+    activity: null
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: ["product/maps/guided-aep-journey-tui/object-map.yaml#agent_run"]
+    slice: 3
+    status: pending
+    priority: critical
+    business_value: 8
+    complexity: M
+    compile_mode: shared_enabler
+    change_group: null
+    dependencies: ["SIBYL-002"]
+    description:
+      what_changes: "A pi-tui app shell subscribes to EngineEvents, renders a UI-mode state machine (form-mode in v0), and streams live progress (tool activity + assistant text)."
+      why: "The face of the seam; proves a custom (non-chat) renderer consuming the engine."
+    acceptance_criteria:
+      - "The shell renders and reacts to phase_changed + progress events."
+      - "No Pi SDK import exists in the renderer (consumes only EngineEvents)."
+    interface_obligations:
+      implements: []
+      consumes: ["renderer<->engine seam (EngineEvent/EngineCommand)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/renderer/app.ts"
+      - "apps/harness/src/renderer/progress.ts"
+    technical_notes: "pi-tui components (Box/Text/Loader/Markdown). Verify raw-TTY behavior under the chosen runtime."
+    verification:
+      unit: ["mode state machine"]
+      integration: ["renders a scripted EngineEvent stream"]
+      contract: []
+  - id: SIBYL-007
+    title: "Modal form component - render form schema, collect values, decision gate"
+    layer: 0
+    module: renderer
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs:
+      - "product/maps/guided-aep-journey-tui/object-map.yaml#vision"
+      - "product/maps/guided-aep-journey-tui/object-map.yaml#project"
+    slice: 4
+    status: pending
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-006", "SIBYL-002"]
+    description:
+      what_changes: "A modal form (ctx.ui.custom / pi-tui Input+Editor+SelectList) renders form_requested.schema, collects values -> submit_form, and renders decision_requested -> submit_decision."
+      why: "The product's signature UX - a structured modal form for README construction, not a chat transcript."
+    acceptance_criteria:
+      - "form_requested renders editable fields; submit_form sends collected values."
+      - "decision_requested renders options; submit_decision sends the choice."
+      - "It is a modal form, not a chat transcript."
+    interface_obligations:
+      implements: []
+      consumes: ["renderer<->engine seam (form_requested/decision_requested)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/renderer/modal-form.ts"
+    technical_notes: "object_model_refs bind to Vision + Project; respect the approved Object Map IA."
+    verification:
+      unit: ["field collection -> submit_form payload"]
+      integration: ["form -> decision -> submit round-trip against a stub engine"]
+      contract: []
+  - id: SIBYL-008
+    title: "End-to-end Originate journey (integration)"
+    layer: 0
+    module: engine
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 5
+    status: pending
+    priority: critical
+    business_value: 10
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-003", "SIBYL-005", "SIBYL-007"]
+    description:
+      what_changes: "Wire renderer<->engine<->tools<->memory: from an empty dir, SIBYL drives the modal-form imagine pass, writes README.md, git init + commits it, and persists >=1 decision entry - with no raw Pi/git commands typed."
+      why: "The Layer-0 gate proof - the walking skeleton walks."
+    acceptance_criteria:
+      - "From an empty temp dir, a full run produces a committed README.md in a new local git repo."
+      - ">=1 decision-memory entry is persisted."
+      - "Live progress renders throughout; the user types no raw Pi/git commands."
+    interface_obligations:
+      implements: []
+      consumes: ["renderer<->engine seam", "engine -> tools", "engine -> memory"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/main.ts"
+    technical_notes: "This story IS the L0 layer-gate journey (Tier-2). e2e target should be cli (TUI), not the web/deployed policy set during scaffold - reconcile via /aep-e2e-skill-scaffolding."
+    verification:
+      unit: []
+      integration: ["empty dir -> committed README + >=1 decision, no manual commands"]
+      contract: []
+
+# ─── WAVES (execution slices within Layer 0) ─────────────────────
+waves:
+  - layer: 0
+    wave: 1
+    stories: ["SIBYL-001", "SIBYL-004"]
+    theme: "Foundations - engine boot + narrow git tool (no deps)"
+  - layer: 0
+    wave: 2
+    stories: ["SIBYL-002", "SIBYL-005"]
+    theme: "Engine seam + decision memory"
+  - layer: 0
+    wave: 3
+    stories: ["SIBYL-003", "SIBYL-006"]
+    theme: "Drive imagine->README + TUI shell"
+  - layer: 0
+    wave: 4
+    stories: ["SIBYL-007"]
+    theme: "Modal form"
+  - layer: 0
+    wave: 5
+    stories: ["SIBYL-008"]
+    theme: "End-to-end Originate integration (walking skeleton)"
+
+# ─── TOPOLOGY ────────────────────────────────────────────────────
+topology:
+  roles:
+    - name: implementer
+      purpose: "Takes a story spec, produces code + tests + PR for a TypeScript harness module."
+      does: ["implement", "unit test", "contract test", "submit PR"]
+      does_not: ["decide scope", "modify architecture", "skip tests"]
+      input_contract:
+        story_spec: "Full story from stories section"
+        context_slice:
+          context_document: "Pruned to: problem, constraints, relevant layer"
+          system_map_module: "This story's module definition"
+          adjacent_interfaces: "Interface contracts where from/to matches module"
+          dependency_artifacts: "Public API surface from completed dependencies"
+          object_map_slice: "For UI stories: the object-map slice from object_model_refs"
+      output_contract:
+        implementation:
+          branch_name: "string"
+          files_changed: "FileDiff[]"
+          pr_url: "string"
+        verification:
+          unit_tests: "TestResult[]"
+          contract_tests: "TestResult[]"
+          all_passing: "boolean"
+        status_report:
+          story_id: "string"
+          outcome: "success | failure"
+          error_summary: "string (if failure)"
+          what_was_not_tried: "string[]"
+      context_composition:
+        - "Story spec (full)"
+        - "Context Document (pruned)"
+        - "System Map (story's module + adjacent interfaces)"
+        - "Object-map slice (UI stories)"
+        - "Dependency artifacts (public API surface)"
+      cost_budget:
+        input_tokens_max: 50000
+        output_tokens_max: 20000
+        alert_threshold_total: 100000
+  routing:
+    dispatch: fifo_within_slice
+    concurrency_limit: 3
+    conflict_detection: files_affected_overlap
+    retry: "2x same agent -> failure analyst -> fresh agent -> human escalation"
+    autonomous: false
+    auto_design: false
+    skip_human_eval: none
+    full_auto: false
+    auto_outcome_eval: none
+    deploy_targets:
+      staging_url: null
+      production_url: null
+    dogfood:
+      method: auto
+      post_deploy_env: none
+      on_issue: create_story
+    post_merge_guard:
+      window_min: 15
+      auto_revert: false
+      health_signals: []
+    telemetry_sources: [] # L0 success metric (task_completion_rate) is QUALITATIVE - measured by dogfooding a local TUI; no telemetry tool. Mark unmeasured; reflect pauses for human judgment.
+    watch:
+      sources: []
+      interval: 30m
+      auto_create: false
+  handoffs:
+    - from: implementer
+      to: evaluator
+      trigger: implementation_complete
+      payload: "eval-request.md + code diff + contracts.md + feature-verification.json"
+      validation:
+        - "All tasks committed on the feature branch"
+        - "Tests run locally and pass"
+        - "eval-request.md created with round number and change summary"
+      on_validation_failure: "reject handoff, notify source agent"
+
+# ─── LAYER GATES ─────────────────────────────────────────────────
+layer_gates:
+  - layer: 0
+    status: not_started
+    test_definition: "From an empty dir, SIBYL drives the modal-form imagine pass, writes + commits README.md in a new local git repo, persists >=1 decision entry, renders live progress, with no raw commands typed."
+    journeys:
+      - skills/e2e-test/journeys/00-walking-skeleton.md
+    coverage:
+      criteria_total: 22
+      criteria_covered: 0
+      uncovered: []
+    evidence:
+      scripted: null
+      journeys: []
+      matrix: docs/layer-gates/0.md
+    results:
+      tests_run: 0
+      tests_passed: 0
+      tests_failed: 0
+      failures: []
+    completed_at: null
+
+# ─── COST ────────────────────────────────────────────────────────
+cost:
+  total_usd: 0
+  by_layer: {}
+  by_module: {}
+  by_story: {}
+  alerts: []
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
   - date: 2026-06-30
     type: initial
     author: human
-    summary: >
-      Envision: opportunity brief (PROCEED) + Context Document for SIBYL - a
-      TUI-first, Pi-driven guided AEP journey system. Walking skeleton = Originate
-      (git init + modal-form imagine->README + local commit + inline decision
-      memory via pi.appendEntry). Architecture: build on pi-tui + pi-coding-agent
-      SDK, custom-rendered modal-form -> story-map UI, engine<->renderer seam,
-      harness as a separate Node 22.19 process pinned to Pi 0.80.2. Stress-tested
-      by three independent reviewers (viability / feasibility / scope); resolutions
-      recorded in product.stress_test. Pi integration research captured in
-      docs/research/pi-integration.md.
+    summary: "Envision: opportunity brief (PROCEED) + Context Document for SIBYL."
     sections_changed:
       - opportunity
       - personas
       - capabilities
       - product
       - calibration
+  - date: 2026-06-30
+    type: map_update
+    author: human
+    summary: >
+      Map: System Map (engine / renderer / tools / memory; engine<->renderer seam
+      as the load-bearing boundary, ADR-001..003) approved by the user. Decomposed
+      8 Layer-0 (Originate) stories across the four modules + an end-to-end
+      integration story, in 5 waves. Topology (implementer + evaluator, concurrency
+      3, autonomous false). L0 layer gate + cost initialized. Note: e2e policy
+      (web/deployed-cloudflare) was set for the scaffolded web app; the harness is
+      TUI/cli - reconcile via /aep-e2e-skill-scaffolding (target cli). Telemetry:
+      L0 success metric is qualitative (dogfood), no source.
+    sections_changed:
+      - architecture
+      - stories
+      - waves
+      - topology
+      - layer_gates
+      - cost

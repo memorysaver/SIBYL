@@ -1,0 +1,168 @@
+schema: object-model/v1
+project: SIBYL
+updated_at: 2026-06-30
+
+# Cross-capability, USER-FACING object ontology (ORCA Rounds O + R).
+# v0 (Originate) objects are high-confidence; the story-map objects
+# (story/layer/gate/journey) arrive at L3 and are low-confidence placeholders
+# to be modeled in the L3 extension pass.
+
+objects:
+  - id: project
+    name: "Project"
+    aliases: ["mission"]
+    description: "The software project being taken through the AEP lifecycle."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["activity:originate", "story:SIBYL-008", "problem"]
+    confidence: high
+    naming_decision: null
+    open_questions: []
+  - id: repo
+    name: "Repo"
+    aliases: ["repository", "git repo"]
+    description: "The git repository created for the project."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["activity:originate", "story:SIBYL-004", "story:SIBYL-008"]
+    confidence: high
+    naming_decision: null
+    open_questions: []
+  - id: vision
+    name: "Vision"
+    aliases: ["README", "manifesto", "brief"]
+    description: "The project's vision document (the README) constructed during the imagine pass."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["activity:originate", "story:SIBYL-003", "story:SIBYL-007"]
+    confidence: high
+    naming_decision: "User-perceived object is the project's vision; README.md is its file form."
+    open_questions: ["Is 'Vision' the right user-facing name, or 'README' / 'Brief'?"]
+  - id: agent_run
+    name: "Agent Run"
+    aliases: ["run", "session"]
+    description: "A Pi agent run driving a task, with live progress the user watches."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["story:SIBYL-003", "story:SIBYL-006", "architecture"]
+    confidence: high
+    naming_decision: null
+    open_questions: []
+  - id: decision
+    name: "Decision"
+    aliases: ["decision memory", "choice"]
+    description: "A captured human decision during a run (the decision-memory record)."
+    backs_onto: ["DecisionEntry"]
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["story:SIBYL-005", "domain_model:DecisionEntry"]
+    confidence: high
+    naming_decision: null
+    open_questions: []
+  - id: story
+    name: "Story"
+    aliases: ["work item"]
+    description: "An AEP unit of work shown on the story-map (L3+)."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["product:layers"]
+    confidence: low
+    naming_decision: null
+    open_questions: ["Introduced at L3 (story-map mode); model fully in the L3 extension pass."]
+  - id: journey
+    name: "Journey"
+    aliases: ["lifecycle", "story map"]
+    description: "The AEP lifecycle journey of a project across phases/layers (L3+)."
+    backs_onto: []
+    appears_in: ["guided-aep-journey-tui"]
+    source_evidence: ["product:problem", "product:goals"]
+    confidence: low
+    naming_decision: null
+    open_questions: ["Introduced at L3; the anchor object of story-map mode."]
+
+relationships:
+  - from: project
+    to: vision
+    cardinality: one_to_one
+    label: "is described by"
+    nested: true
+  - from: project
+    to: repo
+    cardinality: one_to_one
+    label: "lives in"
+    nested: false
+  - from: project
+    to: agent_run
+    cardinality: one_to_many
+    label: "runs"
+    nested: true
+  - from: agent_run
+    to: decision
+    cardinality: one_to_many
+    label: "captures"
+    nested: true
+
+shared_attributes:
+  - object: project
+    attributes:
+      - name: name
+        kind: core
+        type: string
+        notes: null
+      - name: description
+        kind: secondary
+        type: string
+        notes: null
+      - name: created_at
+        kind: metadata
+        type: date
+        notes: null
+  - object: vision
+    attributes:
+      - name: title
+        kind: core
+        type: string
+        notes: null
+      - name: content
+        kind: core
+        type: string
+        notes: "the README markdown body"
+      - name: status
+        kind: secondary
+        type: enum
+        notes: "draft | committed"
+  - object: agent_run
+    attributes:
+      - name: phase
+        kind: core
+        type: enum
+        notes: "form | running | decision | done | failed"
+      - name: status
+        kind: core
+        type: enum
+        notes: null
+  - object: decision
+    attributes:
+      - name: choice
+        kind: core
+        type: string
+        notes: null
+      - name: phase
+        kind: secondary
+        type: string
+        notes: null
+      - name: at
+        kind: metadata
+        type: number
+        notes: null
+
+naming_decisions:
+  - object: vision
+    chosen: "Vision"
+    rejected: ["README", "Manifesto", "Brief"]
+    reason: "The user-perceived object is the project's vision; README.md is its file form. (Open for review at the gate.)"
+
+provenance:
+  generated_by: aep-map
+  rounds_completed: ["O", "R"]
+  reviewed: false
+  reviewed_at: null

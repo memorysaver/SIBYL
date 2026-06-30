@@ -1,0 +1,135 @@
+schema: object-map/v1
+capability: guided-aep-journey-tui
+status: draft
+generated_by: aep-map
+generated_at: 2026-06-30
+approved_at: null
+approved_by: null
+object_model_ref: product/object-model.yaml
+
+# Capability-scoped IA. v0 (Originate) objects only; the story-map objects
+# (story / journey / layer / gate) are added in the L3 extension pass.
+
+# ─── ROUND O — objects in play ──────────────────────────────────
+primary_objects: ["project", "vision", "agent_run"]
+supporting_objects: ["repo", "decision"]
+
+# ─── ROUND R — Nested Object Matrix (capability-local) ──────────
+relationships:
+  - from: project
+    to: vision
+    cardinality: one_to_one
+    nested: true
+    nav: true
+  - from: project
+    to: repo
+    cardinality: one_to_one
+    nested: false
+    nav: false
+  - from: project
+    to: agent_run
+    cardinality: one_to_many
+    nested: true
+    nav: true
+  - from: agent_run
+    to: decision
+    cardinality: one_to_many
+    nested: true
+    nav: true
+
+# ─── ROUND C — CTA Matrix ───────────────────────────────────────
+ctas:
+  - object: project
+    role: solo-aep-builder
+    actions:
+      - verb: "originate"
+        from_story: SIBYL-008
+        placement: global
+        priority: primary
+  - object: vision
+    role: solo-aep-builder
+    actions:
+      - verb: "construct (imagine)"
+        from_story: SIBYL-007
+        placement: detail
+        priority: primary
+      - verb: "commit"
+        from_story: SIBYL-008
+        placement: detail
+        priority: primary
+  - object: agent_run
+    role: solo-aep-builder
+    actions:
+      - verb: "watch progress"
+        from_story: SIBYL-006
+        placement: inline
+        priority: primary
+      - verb: "abort"
+        from_story: SIBYL-002
+        placement: global
+        priority: secondary
+
+# ─── ROUND A — attribute priority ───────────────────────────────
+attributes:
+  - object: project
+    core: ["name"]
+    secondary: ["description"]
+    metadata: ["created_at"]
+  - object: vision
+    core: ["title", "content"]
+    secondary: ["status"]
+    metadata: []
+  - object: agent_run
+    core: ["phase", "status"]
+    secondary: ["progress_log"]
+    metadata: []
+  - object: repo
+    core: ["path"]
+    secondary: []
+    metadata: ["initialized"]
+  - object: decision
+    core: ["choice"]
+    secondary: ["phase"]
+    metadata: ["at"]
+
+# ─── ROUND 4 — representation hints (structural IA only) ─────────
+screens:
+  - object: project
+    views: ["detail"]
+    card_fields: ["name"]
+    empty_state: "Originate a new project"
+  - object: vision
+    views: ["create"]
+    card_fields: ["title"]
+    empty_state: "Imagine the project - start the README"
+  - object: agent_run
+    views: ["detail"]
+    card_fields: ["phase"]
+    empty_state: "No active run"
+
+navigation:
+  anchor_object: project
+  entry_points: ["project"]
+
+# ─── OBJECT-FIRST DEFAULT + TASK-ORIENTED ESCAPE HATCH ──────────
+interaction_modes:
+  - flow: originate
+    mode: task_oriented
+    reason: "Origination is a single-goal, linear, one-shot guided flow (imagine -> README -> commit) for a brand-new project - a deliberate wizard, not object browsing. EXCEPTION to confirm at the /aep-model gate."
+
+# ─── STORY COVERAGE INDEX ───────────────────────────────────────
+coverage:
+  - story: SIBYL-006
+    objects: ["agent_run"]
+    screens: ["agent_run:detail"]
+  - story: SIBYL-007
+    objects: ["vision", "project"]
+    screens: ["vision:create"]
+  - story: SIBYL-008
+    objects: ["project", "vision", "repo", "decision", "agent_run"]
+    screens: ["vision:create", "agent_run:detail"]
+
+open_questions:
+  - "Story-map objects (story / journey / layer / gate) are introduced at L3 (story-map mode); model them in the L3 extension pass."
+  - "Is 'Vision' the right user-facing name for the README object, or 'README' / 'Brief'?"
+  - "Confirm the originate flow as a task_oriented wizard (vs object-first)."
