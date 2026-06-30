@@ -374,12 +374,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-004-git-tool"
     openspec_change: "SIBYL-004"
     started_at: "2026-06-30T10:28:53Z"
     dispatched_at_epoch: 3
+    completed_at: "2026-06-30T12:35:15Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/2"
+    merge_commit: "c59806e"
     priority: high
     business_value: 7
     complexity: S
