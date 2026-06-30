@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 4
+dispatch_epoch: 5
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -343,12 +343,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 3
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-003-originate-drive"
     openspec_change: "SIBYL-003"
     started_at: "2026-06-30T12:40:18Z"
     dispatched_at_epoch: 4
+    completed_at: "2026-06-30T13:02:47Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/6"
+    merge_commit: "3df3e6b"
     priority: critical
     business_value: 9
     complexity: M
@@ -465,12 +468,15 @@ stories:
     calibration_type: null
     object_model_refs: ["product/maps/guided-aep-journey-tui/object-map.yaml#agent_run"]
     slice: 3
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-006-tui-shell"
     openspec_change: "SIBYL-006"
     started_at: "2026-06-30T12:40:18Z"
     dispatched_at_epoch: 4
+    completed_at: "2026-06-30T13:02:47Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/5"
+    merge_commit: "c7b5bad"
     priority: critical
     business_value: 8
     complexity: M
@@ -506,7 +512,12 @@ stories:
       - "product/maps/guided-aep-journey-tui/object-map.yaml#vision"
       - "product/maps/guided-aep-journey-tui/object-map.yaml#project"
     slice: 4
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-007-modal-form"
+    openspec_change: "SIBYL-007"
+    started_at: "2026-06-30T13:02:47Z"
+    dispatched_at_epoch: 5
     priority: critical
     business_value: 9
     complexity: M
@@ -790,5 +801,19 @@ changelog:
       + SIBYL-006 (TUI shell) in parallel - both unblocked by the seam, disjoint files.
       dispatch_epoch -> 4. Learning banked: Pi resumability caveat (no sync flush
       pre-dispose; session_start not auto-fired) for SIBYL-003/008.
+    sections_changed:
+      - stories
+  - date: 2026-06-30
+    type: autopilot
+    author: human
+    summary: >
+      Ticks 8-9: startup-hiccup hit SIBYL-003/006 workers (0-tool returns); resumed
+      both -> merged clean. SIBYL-006 (PR #5, c7b5bad; pi-tui renders headless under
+      Node+Bun) + SIBYL-003 (PR #6, 3df3e6b) done. 6/8 L0 merged. Pi drift banked:
+      setActiveToolsByName (not setActiveTools); message_update deltas nested on
+      assistantMessageEvent; read-only tools read,grep,find,ls; form schema
+      [product,problem,vision] + decision [Commit,Revise,Cancel]; workers must run
+      bun install (Pi deps in lock, uninstalled). Launched SIBYL-007 (modal form);
+      SIBYL-008 (e2e integration) unblocks after it. dispatch_epoch -> 5.
     sections_changed:
       - stories
