@@ -415,12 +415,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-005-decision-memory"
     openspec_change: "SIBYL-005"
     started_at: "2026-06-30T10:28:53Z"
     dispatched_at_epoch: 3
+    completed_at: "2026-06-30T12:36:00Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/3"
+    merge_commit: "beb9083"
     priority: high
     business_value: 7
     complexity: S
