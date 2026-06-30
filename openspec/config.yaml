@@ -1,0 +1,29 @@
+schema: spec-driven
+
+context: |
+  Project: SIBYL — a specification-bound, deterministic control surface for
+  agentic engineering. A Pi-based harness core (planned) executes bounded work
+  units against explicit specs; a Better-T-Stack web app is the observer/control
+  surface for execution state. The harness core and the web system are separate;
+  determinism comes from the execution contract, not the UI.
+
+  Tech stack (web/control surface):
+    Language: TypeScript
+    Frontend: TanStack Start (SSR, TanStack Router) + TailwindCSS + shadcn/ui (packages/ui)
+    Backend: Hono on Cloudflare Workers
+    API: oRPC (end-to-end type-safe, OpenAPI)
+    Data: Drizzle ORM + Cloudflare D1 (SQLite)
+    Auth: Better Auth
+    Monorepo: Turborepo + Bun
+    Lint/format: Oxlint + Oxfmt
+    Deploy: Cloudflare via Alchemy (packages/infra)
+    Docs: Astro Starlight (apps/docs)
+
+  Workflow: Agentic Engineering Patterns (AEP) — envision → map → design →
+  dispatch → build → wrap → reflect. Spec-driven, trunk-based on main,
+  conventional commits, one commit per task.
+
+# Per-artifact rules (optional). Example:
+#   rules:
+#     proposal:
+#       - Always include a "Non-goals" section
