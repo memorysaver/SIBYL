@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 5
+dispatch_epoch: 6
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -512,12 +512,15 @@ stories:
       - "product/maps/guided-aep-journey-tui/object-map.yaml#vision"
       - "product/maps/guided-aep-journey-tui/object-map.yaml#project"
     slice: 4
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-007-modal-form"
     openspec_change: "SIBYL-007"
     started_at: "2026-06-30T13:02:47Z"
     dispatched_at_epoch: 5
+    completed_at: "2026-06-30T13:18:23Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/7"
+    merge_commit: "ffbbace"
     priority: critical
     business_value: 9
     complexity: M
@@ -551,7 +554,12 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 5
-    status: pending
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "sibyl-008-e2e-integration"
+    openspec_change: "SIBYL-008"
+    started_at: "2026-06-30T13:18:23Z"
+    dispatched_at_epoch: 6
     priority: critical
     business_value: 10
     complexity: M
