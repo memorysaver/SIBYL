@@ -554,12 +554,15 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 5
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "sibyl-008-e2e-integration"
     openspec_change: "SIBYL-008"
     started_at: "2026-06-30T13:18:23Z"
     dispatched_at_epoch: 6
+    completed_at: "2026-06-30T13:36:31Z"
+    pr_url: "https://github.com/memorysaver/SIBYL/pull/8"
+    merge_commit: "2c5de72"
     priority: critical
     business_value: 10
     complexity: M
@@ -687,21 +690,25 @@ topology:
 # ─── LAYER GATES ─────────────────────────────────────────────────
 layer_gates:
   - layer: 0
-    status: not_started
+    # scripted_passed = machinery + Tier-2 cli dogfood green pre-merge. The two-phase flip to
+    # `passed` (formal 22-criterion coverage matrix + qualitative outcome-contract eval) is the
+    # HUMAN gate step: /aep-wrap (flip) + /aep-reflect (outcome). full_auto:false => it pauses here.
+    status: scripted_passed
     test_definition: "From an empty dir, SIBYL drives the modal-form imagine pass, writes + commits README.md in a new local git repo, persists >=1 decision entry, renders live progress, with no raw commands typed."
     journeys:
       - skills/e2e-test/journeys/00-walking-skeleton.md
     coverage:
       criteria_total: 22
-      criteria_covered: 0
+      criteria_covered: 0 # per-story criteria all proven by each PR's tests; formal 22-criterion matrix is the /aep-wrap step
       uncovered: []
     evidence:
-      scripted: null
-      journeys: []
+      scripted: "All 8 L0 stories merged (PRs #1-8) with passing vitest against real Pi 0.80.2; full harness suite 70 tests green on main @2c5de72."
+      journeys:
+        - "skills/e2e-test/journeys/00-walking-skeleton.md (cli, pre-merge): both scenarios ran green via bash in SIBYL-008 - bun apps/harness/src/cli.ts originate => committed README + decisions:1; decisions ls reads it back."
       matrix: docs/layer-gates/0.md
     results:
-      tests_run: 0
-      tests_passed: 0
+      tests_run: 70
+      tests_passed: 70
       tests_failed: 0
       failures: []
     completed_at: null
@@ -825,3 +832,18 @@ changelog:
       SIBYL-008 (e2e integration) unblocks after it. dispatch_epoch -> 5.
     sections_changed:
       - stories
+  - date: 2026-06-30
+    type: autopilot
+    author: human
+    summary: >
+      LAYER 0 COMPLETE. SIBYL-007 (modal form, PR #7, ffbbace) + SIBYL-008 (e2e
+      integration capstone, PR #8, 2c5de72) merged. All 8 L0 stories done; the
+      walking skeleton WALKS: `bun apps/harness/src/cli.ts originate` -> empty dir
+      to committed README + >=1 decision + live progress, no raw commands (70 tests
+      green vs real Pi 0.80.2). L0 gate -> scripted_passed (machinery + cli Tier-2
+      dogfood green pre-merge). Autopilot PAUSED at the L0 gate (full_auto:false):
+      awaiting human outcome-eval / two-phase flip (/aep-wrap + /aep-reflect) and the
+      L0.5 ux-flow calibration (TUI focus/theme) before Layer 1. dispatch_epoch -> 6.
+    sections_changed:
+      - stories
+      - layer_gates
