@@ -1,0 +1,47 @@
+schema: v1
+project: SIBYL
+version: "0.1.0"
+updated_at: 2026-06-30
+dispatch_epoch: 0
+
+# ─── SPLIT MODE ──────────────────────────────────────────────────
+# The stable product definition lives in product/index.yaml
+# (opportunity + personas + capabilities + product). This file holds
+# OPERATIONAL state only. architecture / stories / topology / layer_gates /
+# waves / cost are populated by /aep-map.
+
+# ─── CALIBRATION (Phase 1) ───────────────────────────────────────
+calibration:
+  plan:
+    - layer: 0.5
+      dimensions: ["ux-flow"]
+      trigger: "After the L0 modal-form walking skeleton runs end-to-end - calibrate the form IA / layout before extending the UI."
+    - layer: 2
+      dimensions: ["scope-direction"]
+      trigger: "While driving envision - confirm product scope / direction as it sharpens."
+    - layer: 3
+      dimensions: ["object-model"]
+      trigger: "Before building the story-mapping UI - auto-draft and human-approve the noun-first Object Map."
+  history: []
+
+# ─── CHANGELOG ───────────────────────────────────────────────────
+changelog:
+  - date: 2026-06-30
+    type: initial
+    author: human
+    summary: >
+      Envision: opportunity brief (PROCEED) + Context Document for SIBYL - a
+      TUI-first, Pi-driven guided AEP journey system. Walking skeleton = Originate
+      (git init + modal-form imagine->README + local commit + inline decision
+      memory via pi.appendEntry). Architecture: build on pi-tui + pi-coding-agent
+      SDK, custom-rendered modal-form -> story-map UI, engine<->renderer seam,
+      harness as a separate Node 22.19 process pinned to Pi 0.80.2. Stress-tested
+      by three independent reviewers (viability / feasibility / scope); resolutions
+      recorded in product.stress_test. Pi integration research captured in
+      docs/research/pi-integration.md.
+    sections_changed:
+      - opportunity
+      - personas
+      - capabilities
+      - product
+      - calibration

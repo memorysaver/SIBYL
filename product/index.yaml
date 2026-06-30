@@ -1,0 +1,331 @@
+schema: v1
+project: SIBYL
+version: "0.1.0"
+updated_at: 2026-06-30
+dispatch_epoch: 0
+
+# ─── OPPORTUNITY (Phase 0) ───────────────────────────────────────
+opportunity:
+  bet: >
+    I believe solo AEP builders (starting with the author, dogfooding) and small
+    teams have the problem that AEP is skill-based - it demands fluency in a
+    7-phase workflow, so knowledge and live progress are hard to align across a
+    team while autopilot agents run ahead of any shared picture - and I can build
+    a TUI-first story-journey system on the Pi coding-agent that guides a project
+    from an empty repo through the AEP lifecycle, visualizes progress, and captures
+    decision memory, because I authored AEP and Pi gives a real agent substrate to
+    drive and observe.
+  why_now: >
+    Pi exposes an SDK + extension system to spawn/observe/constrain coding agents;
+    AEP is now codified as a 7-phase process; agent execution is cheap and abundant,
+    so the bottleneck has moved upstream to alignment and ambiguity.
+  counter_arguments:
+    - "Visualization != simplification: a TUI may make experts faster without lowering the entry barrier. RESOLVED: agents run on autopilot, so visualization + decision memory is enough; the human sees and aligns, not hand-holds."
+    - "Audience of ~one today: the realistic first user is the author. ACCEPTED: personal-power-tool-first is fine."
+    - "TUI-first contradicts the manifesto's 'not dashboard-first'. RESOLVED: update the README to TUI-first; story-mapping<->AEP-workflow alignment is the key to success."
+    - "Two moving upstreams (Pi + AEP) cause recurring rework. RESOLVED: AEP leads, SIBYL follows until it can autopilot most agentic-engineering missions."
+    - "Visualization buys observability, not determinism. RESOLVED: goal reframed to legible/observable; determinism is a separate later claim via gates/constraints/replayable decision memory."
+    - "Layer 0 validates the engine, not the legibility bet, and does not exercise the /skill: mechanism until L1. ACCEPTED RISK: origination-first is the deliberate product story; /skill: is proven at L1 (scaffold); legibility at L3 (story-map)."
+  scale_of_impact: >
+    A capability/adoption unlock rather than a time-saver: the difference between
+    'AEP is lore only its author can wield' and 'a small team can see and steer the
+    journey'. That is what makes the solo->team path real.
+  kill_criteria:
+    - "After dogfooding, SIBYL does not measurably cut the author's re-work / cognitive load vs raw slash commands (baseline to be instrumented on the next real mission - see open_questions)."
+    - "At the story-map layer, no second person can follow a project's journey in the TUI without narration."
+    - "Pi's SDK cannot reliably spawn/observe/constrain agents enough to drive journeys."
+  decision: proceed
+  decided_at: 2026-06-30
+
+# ─── PERSONAS ────────────────────────────────────────────────────
+personas:
+  - id: solo-aep-builder
+    description: >
+      The author of AEP and similar solo builders running agentic workflows.
+      Highly fluent in the AEP 7-phase process; works in a terminal; dogfooding
+      SIBYL on real projects.
+    jtbd: >
+      When I originate and run my own AEP projects, I want to drive the workflow
+      with a live picture of where each story sits, so I can cut re-work versus
+      running slash commands blind.
+  - id: small-team-collaborator
+    description: >
+      A collaborator on a small team who is NOT deeply fluent in the AEP workflow.
+      North-star persona; not validated in v0.
+    jtbd: >
+      When I join a project mid-flight, I want to follow and steer its AEP journey
+      without deep workflow fluency or someone narrating AEP to me, so I can
+      contribute without a long onboarding.
+
+# ─── CAPABILITIES ────────────────────────────────────────────────
+capabilities:
+  - id: guided-aep-journey-tui
+    description: >
+      Take a project from an empty repo through the AEP lifecycle via a Pi agent,
+      rendered as a purpose-built TUI (modal-form mode for origination, converting
+      to a story-mapping interface after envision + map), with live progress and
+      decision memory.
+
+# ─── PRODUCT (Phase 1) ───────────────────────────────────────────
+product:
+  problem: >
+    AEP is skill-based - it demands fluency in a 7-phase workflow
+    (envision->map->design->dispatch->build->wrap->reflect), so knowledge and live
+    progress are hard to align across a small team, while autopilot agents run
+    ahead of any shared picture (state locked in YAML + slash-command lore).
+
+  goals:
+    - "Make the AEP journey legible - from originating a repo through shipping."
+    - "Provide a more OBSERVABLE way to harness agents (determinism is a separate later claim via gates/constraints/replayable decision memory)."
+    - "Lower alignment cost for small teams (tested at the story-map layer, not v0)."
+    - "Move toward autopilot of most agentic-engineering missions over time."
+
+  non_goals:
+    - statement: "Reuse a regular chat-style (claude-code-style) TUI."
+      reasoning: "SIBYL is a purpose-built UI - a modal form for origination that converts to a story-mapping interface. A chat transcript is the wrong surface."
+    - statement: "Create a remote GitHub repo (gh repo create) in the walking skeleton."
+      reasoning: "A local git init proves the architecture; the remote side-effect adds auth + non-atomic failure without proving the driver. Deferred to an optional later step."
+    - statement: "Adopt or operate on an existing repo in v0."
+      reasoning: "v0 originates a brand-new repo; existing-repo adoption is revisited with detect-state routing at the story-map layer."
+    - statement: "Real memory backends (mgrep / MITS) in v0."
+      reasoning: "v0 captures decisions inline via pi.appendEntry; a pluggable backend is a later layer."
+    - statement: "Subagent orchestration, Cloudflare/web surface, multi-project, full story-map render in v0."
+      reasoning: "Each is a distinct later layer; the walking skeleton proves the driver + origination only."
+
+  mvp_boundary:
+    in_scope:
+      - "Launch SIBYL on an empty working dir; detect there is no project."
+      - "Drive a Pi agent through a MODAL FORM (not chat) to run an imagine pass and construct a README.md."
+      - "git init a new local repo and commit the README."
+      - "Render live agent progress (tool calls + streaming) in SIBYL's own pi-tui UI."
+      - "Capture at least one decision-memory entry inline via pi.appendEntry."
+    out_of_scope:
+      - "gh repo create or any remote side-effect."
+      - "Driving a packaged /skill: (first proven at Layer 1 - scaffold)."
+      - "Story-map rendering, detect-state routing, session-resume."
+      - "A second-person 'follows unaided' test (belongs to the story-map layer)."
+    deferred:
+      - "gh repo create as an optional post-originate step (Layer 0.5)."
+      - "Pluggable decision-memory backend - mgrep / MITS (Layer 5)."
+
+  constraints:
+    required_stack:
+      frontend: "pi-tui (@earendil-works/pi-tui) - custom-rendered TUI (modal-form -> story-map modes); NOT Pi's InteractiveMode chat"
+      backend: "pi-coding-agent (@earendil-works/pi-coding-agent) SDK - createAgentSession + session.subscribe; SIBYL driver logic as a host-agnostic engine behind an engine<->renderer seam"
+      database: "n/a (v0) - decision memory via pi.appendEntry (session-persisted)"
+      orm: "n/a (v0)"
+    preferred_stack: {}
+    infrastructure: >
+      Separate Node >=22.19 (or Bun, to be verified for pi-tui) process - the harness
+      cannot run inside Cloudflare Workers (needs TTY, native add-ons, child-process
+      spawn, FS skill discovery). New apps/harness workspace; harness taken OUT of the
+      shared Bun catalog and pinned to Node 22.19 + TS 5.9.x / @types/node 22.19 to
+      match Pi (avoids the catalog's typescript ^6 skew). Pi packages pinned at 0.80.2
+      in lockstep. The Better-T-Stack web/Cloudflare app stays a separate process;
+      later layers stream results to it via oRPC.
+    external_deps:
+      - name: "Pi coding-agent (@earendil-works/pi-*@0.80.2)"
+        provides: "agent SDK, TUI library, extension system, skill discovery (/skill:<name> from .agents/skills/)"
+        failure_mode: "hard fail (core substrate). plan-mode/subagent are EXAMPLE code - vendor from the pinned 0.80.2 git tag with a thin adapter + API-drift smoke test."
+      - name: "git CLI"
+        provides: "git init + local commit of the originated repo"
+        failure_mode: "hard fail - a project IS a git repo from step one"
+      - name: "model API (LLM provider)"
+        provides: "the reasoning agent driving the imagine / README construction"
+        failure_mode: "surfaced in the TUI; run resumable from the decision log"
+
+  layers:
+    - layer: 0
+      name: "Originate (walking skeleton)"
+      user_can: >
+        Launch SIBYL on nothing -> a modal form drives an imagine pass and constructs
+        README.md -> git init + local commit -> live progress renders in SIBYL's TUI
+        -> one decision-memory entry captured.
+      verification: >
+        From an empty dir, running SIBYL produces a committed README.md in a new local
+        git repo and >=1 pi.appendEntry decision entry, with live progress rendered,
+        without the user typing raw Pi or git commands.
+      outcome_contract:
+        hypothesis: "If SIBYL can drive a Pi agent through a guided modal-form task that writes a real, committed artifact and captures a decision, the extension-driver engine + renderer seam are validated."
+        success_metric:
+          type: task_completion_rate
+          target: ">= 80%"
+        decision_rule:
+          keep_if: "metric >= target"
+          otherwise: "reflect_and_reslice"
+    - layer: 0.5
+      name: "UX-flow alignment"
+      user_can: "(human alignment) calibrate the modal-form IA / layout."
+      outcome_contract: null
+    - layer: 1
+      name: "Scaffold (first /skill: drive - architecture-proof gate)"
+      user_can: "Drive /skill:aep-scaffold through the SDK on the new repo (Better-T-Stack default + AEP infra), observed/gated. This is where 'conduct, don't reimplement' is actually proven."
+      outcome_contract: null
+    - layer: 2
+      name: "Envision"
+      user_can: "Drive /skill:aep-envision -> product/index.yaml."
+      outcome_contract: null
+    - layer: 3
+      name: "Story-map + routing (legibility test)"
+      user_can: "After envision + map are forged, the UI CONVERTS to a user-story-mapping interface showing the AEP journey across lifecycle/layers with live status; detect-state routing resumes at the right step. The 'second person follows unaided' and team-alignment hypotheses are tested here."
+      outcome_contract: null
+    - layer: 4
+      name: "Story execution"
+      user_can: "Drive one story through design->build->wrap->reflect via Pi, streaming progress."
+      outcome_contract: null
+    - layer: 5
+      name: "Pluggable memory"
+      user_can: "Swap inline appendEntry for a real backend (mgrep / MITS)."
+      outcome_contract: null
+    - layer: 6
+      name: "Subagent orchestration"
+      user_can: "Run parallel per-story subagents (adapt Pi's subagent example)."
+      outcome_contract: null
+    - layer: 7
+      name: "Cloudflare / web surface"
+      user_can: "Stream results to the oRPC/Workers backend; web observer surface; autopilot."
+      outcome_contract: null
+
+  activities:
+    - id: originate
+      name: "Originate"
+      description: "git init a new repo and construct the README via a modal form (imagine pass)"
+      order: 1
+      layer_introduced: 0
+    - id: scaffold
+      name: "Scaffold"
+      description: "scaffold the monorepo (Better-T-Stack + AEP infra) via /skill:aep-scaffold"
+      order: 2
+      layer_introduced: 1
+    - id: envision
+      name: "Envision"
+      description: "frame the product via /skill:aep-envision"
+      order: 3
+      layer_introduced: 2
+    - id: map-journey
+      name: "Map and view journey"
+      description: "decompose into a story map and view/steer the journey in the story-mapping UI"
+      order: 4
+      layer_introduced: 3
+    - id: execute-story
+      name: "Execute a story"
+      description: "drive a story through design->build->wrap->reflect"
+      order: 5
+      layer_introduced: 4
+
+  failure_model:
+    classes:
+      - name: "Pi session / model failure"
+        examples: "model API error, agent stalls, skill not found"
+        detection: "session event stream (agent_end with error, missing /skill: expansion)"
+        recovery: "surface in the TUI; re-derive position from the appendEntry decision log and restart the step"
+        escalation: "stop and ask the human; never a silent half-state"
+      - name: "git failure"
+        examples: "git init fails, commit fails, dirty working dir"
+        detection: "non-zero exit from the narrow git tool"
+        recovery: "abort before committing; report; no partial repo state"
+        escalation: "surface to the human"
+    degraded_operation: >
+      With the model unavailable, SIBYL can still render the form and persist
+      collected inputs; the agent-driven README construction pauses until the
+      model returns.
+
+  security_model:
+    trust_boundaries: "Local-first, single trusted operator. The agent has repo filesystem access."
+    auth: "N/A for MVP (no SIBYL accounts). git/gh use the operator's existing local credentials; SIBYL never stores them."
+    secret_handling: >
+      Secrets in .env (operator-managed). The agent runs tools via a NARROW custom
+      git tool rather than full bash where possible. Network-egress limits are NOT
+      enforced (cooperative, not sandboxed) - stated honestly; real containment would
+      require running the harness in a sandbox/container.
+
+  success_criteria:
+    functional:
+      - "From an empty dir, SIBYL produces a committed README.md in a new local git repo without the user typing raw Pi/git commands."
+      - "At least one decision-memory entry is persisted via pi.appendEntry."
+      - "The modal-form UI (not a chat transcript) drives the imagine->README flow and renders live agent progress."
+    non_functional:
+      - "Form-driven origination completes end-to-end in >= 80% of attempts."
+      - "Engine logic is renderer-agnostic: the TUI consumes the engine via the seam (no ctx.ui call hard-wired into orchestration), verified by a smoke test."
+
+  open_questions:
+    - question: "Baseline for the cognitive-load / re-work kill criterion."
+      default_assumption: "Treat L0 as a feasibility + origination spike; do not claim re-work reduction yet."
+      revisit_trigger: "Instrument the raw-slash-command flow on the next real AEP mission to set a measurable baseline."
+    - question: "Decision-memory backend (inline -> mgrep / MITS)."
+      default_assumption: "Inline pi.appendEntry in v0; no abstraction module."
+      revisit_trigger: "Layer 5, when a real backend forces the interface shape."
+    - question: "Subagent orchestration via Pi extension."
+      default_assumption: "Single main agent in v0."
+      revisit_trigger: "Layer 6; adapt examples/extensions/subagent/."
+    - question: "Reuse any Pi UI vs fully custom-render."
+      default_assumption: "Fully custom-render (modal-form -> story-map); engine kept host-agnostic."
+      revisit_trigger: "If custom rendering proves too costly for L0, fall back to Pi InteractiveMode + widgets."
+    - question: "Existing-repo adoption."
+      default_assumption: "v0 originates a new repo only."
+      revisit_trigger: "Layer 3 detect-state routing."
+    - question: "Pi session persistence across a process restart."
+      default_assumption: "Assume in-process only; treat the appendEntry log as the source of truth for resume."
+      revisit_trigger: "Verify against Pi 0.80.2 before relying on cross-restart session resume."
+
+  decisions:
+    - decision: "Conduct, don't reimplement - SIBYL drives existing AEP skills via Pi; it does not reimplement them."
+      reasoning: "AEP leads, SIBYL follows; reuse the installed cross-tool skills."
+      alternatives:
+        - "Reimplement the AEP flow natively in the TUI"
+    - decision: "TUI-first, purpose-built UI - modal-form mode (originate) converting to a story-mapping mode (post envision+map); NOT a chat shell."
+      reasoning: "A structured form is more observable/deterministic than chat and is the product's identity."
+      alternatives:
+        - "Reuse Pi's InteractiveMode chat with widgets"
+    - decision: "Build ON Pi (pi-tui + pi-coding-agent SDK), never fork; driver logic host-agnostic behind an engine<->renderer seam."
+      reasoning: "Honors the manifesto ('without forking Pi internals') and keeps the later web surface from being a rewrite."
+      alternatives:
+        - "Fork Pi"
+        - "Reuse InteractiveMode then rewrite for web"
+    - decision: "Walking skeleton = Originate-only, local (git init + imagine + README + commit); no gh."
+      reasoning: "Local git proves the driver; remote side-effects add risk without proof."
+      alternatives:
+        - "Originate->scaffold->envision full chain"
+        - "Skill-first skeleton"
+        - "Legibility-first skeleton"
+    - decision: "Harness is a separate Node 22.19 process, out of the shared catalog; Pi pinned 0.80.2."
+      reasoning: "The TUI can't run in Workers; this avoids the typescript ^6 catalog skew."
+      alternatives:
+        - "Single shared toolchain"
+
+  stress_test:
+    - challenge: "Layer 0 validates the engine, not the legibility bet; the riskiest assumption is back-loaded to the story-map layer."
+      angle: product_viability
+      resolution: "Accepted as a deliberate origination-first product story; legibility/team-alignment are explicitly tested at Layer 3 (story-map), which carries the second-person kill criterion."
+    - challenge: "'More deterministic' is a category error - visualization buys observability, not determinism."
+      angle: product_viability
+      resolution: "Goal reframed to legible/observable; determinism deferred to a concrete mechanism (gates/constraints/replayable decision memory)."
+    - challenge: "Kill criteria are unfalsifiable and lack a baseline."
+      angle: product_viability
+      resolution: "Re-stated with a measurable target; the re-work criterion is gated on instrumenting the raw-slash-command baseline on the next mission (open question)."
+    - challenge: "The walking skeleton never exercises the /skill: invocation the architecture rests on."
+      angle: technical_feasibility
+      resolution: "Layer 1 (scaffold via /skill:aep-scaffold) is designated the real architecture-proof gate; recorded as accepted risk for L0."
+    - challenge: "The engine couples to TUI primitives, deferring the cross-process (web) boundary to a future cliff."
+      angle: technical_feasibility
+      resolution: "Engine<->renderer seam is a v0 requirement; the engine emits structured events / decision requests and the TUI is one consumer."
+    - challenge: "plan-mode is example code on an unversioned v0.x surface; toolchain skew (typescript ^6 vs Pi 5.9.3)."
+      angle: technical_feasibility
+      resolution: "Vendor plan-mode from the pinned 0.80.2 tag + thin adapter + drift smoke test; harness pinned to Node 22.19 / TS 5.9.x, out of the shared catalog."
+    - challenge: "Originate is scope creep / gh is a remote side-effect; the thinnest L0 should drop the research pass and gh."
+      angle: scope_control
+      resolution: "Dropped gh (remote) from the skeleton; kept git init + imagine + README per explicit product intent; no memory module, no detect-state router, no 0.5 object-model calibrate in L0."
+
+  quality_dimensions:
+    - dimension: ux-flow
+      criticality: high
+      first_calibration_layer: 0.5
+      rationale: "SIBYL renders a custom modal-form UI from v0; the form IA / flow needs human calibration."
+    - dimension: object-model
+      criticality: high
+      first_calibration_layer: 3
+      rationale: "The story-mapping UI is object-heavy (Project/Story/Layer/Gate/AgentRun/Decision); a noun-first object map prevents agents inventing one-screen-per-step wizards. Calibrated when the custom story-map UI is real."
+    - dimension: scope-direction
+      criticality: medium
+      first_calibration_layer: 2
+      rationale: "PM and builder are the same person in v0; mid-build intent correction is lower-urgency but worth a checkpoint as scope grows."
