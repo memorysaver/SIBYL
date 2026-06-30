@@ -157,10 +157,10 @@ class ScriptedSession implements OriginateSession {
   readonly prompts: string[] = [];
   disposed = false;
 
-  readonly #script: AgentSessionEvent[];
+  readonly #script: AgentSessionEvent[] | ((prompt: string) => AgentSessionEvent[]);
   readonly #listeners = new Set<(event: AgentSessionEvent) => void>();
 
-  constructor(script: AgentSessionEvent[]) {
+  constructor(script: AgentSessionEvent[] | ((prompt: string) => AgentSessionEvent[])) {
     this.#script = script;
   }
 
@@ -177,7 +177,8 @@ class ScriptedSession implements OriginateSession {
 
   async prompt(text: string): Promise<void> {
     this.prompts.push(text);
-    for (const event of this.#script) {
+    const script = typeof this.#script === "function" ? this.#script(text) : this.#script;
+    for (const event of script) {
       for (const listener of Array.from(this.#listeners)) {
         listener(event);
       }
@@ -231,6 +232,27 @@ export interface ScriptedConnectOptions {
 export function createScriptedConnect(options: ScriptedConnectOptions = {}): OriginateConnect {
   const readme = options.readme ?? scriptedReadme(options.values ?? {});
   return async () => new ScriptedSession(imagineScript(readme));
+}
+
+/** Recover the originate form values from a {@link buildImaginePrompt} body. */
+export function valuesFromPrompt(prompt: string): Record<string, string> {
+  const grab = (label: string): string => {
+    const match = prompt.match(new RegExp(`^${label}:[ \\t]*(.*)$`, "m"));
+    return match?.[1]?.trim() ?? "";
+  };
+  return { product: grab("Product"), problem: grab("Problem"), vision: grab("Vision") };
+}
+
+/**
+ * Build a `connect` port for the INTERACTIVE TUI that needs no live model: the
+ * form values are embedded in the imagine prompt (`buildImaginePrompt`), so each
+ * connection yields a {@link ScriptedSession} whose README is derived FROM THE
+ * PROMPT at prompt time — the live modal form therefore shows a README reflecting
+ * whatever the user just typed. Swap in `defaultConnect` to drive a real model.
+ */
+export function createPromptDrivenConnect(): OriginateConnect {
+  return async () =>
+    new ScriptedSession((prompt) => imagineScript(scriptedReadme(valuesFromPrompt(prompt))));
 }
 
 // ---------------------------------------------------------------------------
@@ -507,6 +529,119 @@ export function mountOriginate(engine: EngineSeam): MountedOriginate {
 }
 
 // ---------------------------------------------------------------------------
+// Interactive run: drive the LIVE TUI and persist the human's decision.
+// ---------------------------------------------------------------------------
+
+/** The settled outcome of an interactive {@link runOriginateInteractive} pass. */
+export interface InteractiveRunResult {
+  readonly cwd: string;
+  readonly events: readonly EngineEvent[];
+  readonly completion?: { readonly artifacts: readonly string[]; readonly decisions: number };
+  readonly failure?: { readonly class: string; readonly detail: string };
+  readonly decisions: readonly DecisionEntry[];
+  readonly sessionManager: SessionManager;
+}
+
+/** Options for {@link runOriginateInteractive}. */
+export interface RunOriginateInteractiveOptions {
+  /** The (typically empty) working directory the README is written + committed in. */
+  cwd: string;
+  /** Override the agent `connect` port. Default: an offline, prompt-driven one. */
+  connect?: OriginateConnect;
+  /** Override the commit message used by the git tool. */
+  commitMessage?: string;
+  /** Timestamp source for the persisted decision. */
+  now?: () => number;
+  /** Provide the decision-memory store. */
+  sessionManager?: SessionManager;
+}
+
+/**
+ * Drive the originate pipeline LIVE in a real terminal: {@link mountOriginate}
+ * composes the modal form + shell under one pi-tui `TUI`, the human fills the form
+ * and picks the commit decision with the keyboard, and on completion their choice
+ * is persisted to decision-memory (`appendDecision`). Resolves once the run
+ * settles. **Requires a TTY** (`process.stdout.isTTY`). The default
+ * {@link createPromptDrivenConnect} makes the imagine pass deterministic with NO
+ * live model — pass `connect: defaultConnect` to drive a real model instead.
+ */
+export async function runOriginateInteractive(
+  options: RunOriginateInteractiveOptions,
+): Promise<InteractiveRunResult> {
+  const now = options.now ?? Date.now;
+  const connect = options.connect ?? createPromptDrivenConnect();
+  const sessionManager = options.sessionManager ?? SessionManager.inMemory(HARNESS_DIR);
+  const memory = await openDecisionMemory(sessionManager);
+
+  const engine = createEngine(
+    createOriginateCore({ connect, commitMessage: options.commitMessage }),
+  );
+  const events: EngineEvent[] = [];
+  const mounted = mountOriginate(engine);
+
+  return await new Promise<InteractiveRunResult>((resolve, reject) => {
+    let settled = false;
+
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      unsubscribe();
+      mounted.stop();
+      const completedEvent = events.find((event) => event.type === "run_completed");
+      const failedEvent = events.find((event) => event.type === "run_failed");
+      memory
+        .dispose()
+        .then(() =>
+          resolve({
+            cwd: options.cwd,
+            events,
+            completion:
+              completedEvent?.type === "run_completed"
+                ? { artifacts: completedEvent.artifacts, decisions: completedEvent.decisions }
+                : undefined,
+            failure:
+              failedEvent?.type === "run_failed"
+                ? { class: failedEvent.class, detail: failedEvent.detail }
+                : undefined,
+            decisions: recallDecisions(sessionManager),
+            sessionManager,
+          }),
+        )
+        .catch(reject);
+    };
+
+    const unsubscribe: Unsubscribe = engine.subscribe((event) => {
+      events.push(event);
+      if (event.type === "run_completed") {
+        // The human's pick is in the mounted form's model when the run completes.
+        const choice = mounted.form.model.selectedChoice;
+        if (choice !== undefined) {
+          appendDecision(memory.pi, {
+            id: `${ORIGINATE_PHASE}-${now()}`,
+            phase: ORIGINATE_PHASE,
+            decision: choice,
+            at: now(),
+          });
+        }
+        finish();
+      } else if (event.type === "run_failed") {
+        finish();
+      }
+    });
+
+    void Promise.resolve(engine.dispatch({ type: "start_run", cwd: options.cwd })).catch(
+      (error) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        events.push({ type: "run_failed", class: "internal", detail });
+        finish();
+      },
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CLI: `sibyl --version` / `originate` / `decisions ls`.
 // ---------------------------------------------------------------------------
 
@@ -526,7 +661,8 @@ const USAGE = [
   "",
   "Usage:",
   "  sibyl --version",
-  "  sibyl originate --product <p> --problem <q> --vision <v> [--yes] [--cwd <dir>] [--message <m>]",
+  "  sibyl originate --tui [--cwd <dir>] [--message <m>]                          # interactive modal-form TUI",
+  "  sibyl originate --product <p> --problem <q> --vision <v> [--cwd <dir>] [--message <m>]   # non-interactive",
   "  sibyl decisions ls [--cwd <dir>]",
 ].join("\n");
 
@@ -584,7 +720,55 @@ function ensureGitIdentity(): void {
   }
 }
 
+/** The subset of a run result the CLI reports on (headless + interactive share it). */
+interface OriginateCliResult {
+  readonly cwd: string;
+  readonly completion?: { readonly artifacts: readonly string[]; readonly decisions: number };
+  readonly failure?: { readonly class: string; readonly detail: string };
+  readonly decisions: readonly DecisionEntry[];
+}
+
+/** Persist the decision-log mirror and print the run summary; returns the exit code. */
+async function reportOriginateResult(result: OriginateCliResult, io: CliIO): Promise<number> {
+  if (result.failure || !result.completion) {
+    io.err(`originate failed: ${result.failure?.detail ?? "run did not complete"}`);
+    return 1;
+  }
+
+  // Mirror the recalled decision log to disk so `decisions ls` can read it back
+  // across process invocations (the in-process store is per-run).
+  await mkdir(join(result.cwd, ".sibyl"), { recursive: true });
+  await writeFile(
+    join(result.cwd, DECISIONS_MIRROR),
+    `${JSON.stringify(result.decisions, null, 2)}\n`,
+    "utf8",
+  );
+
+  io.out(`artifacts: ${result.completion.artifacts.join(", ")}`);
+  io.out(`decisions: ${result.decisions.length}`);
+  for (const entry of result.decisions) {
+    io.out(`  - [${entry.phase}] ${entry.decision} (${entry.id})`);
+  }
+  return 0;
+}
+
 async function cliOriginate(parsed: ParsedFlags, io: CliIO): Promise<number> {
+  const cwd = parsed.flags.cwd ?? process.cwd();
+  ensureGitIdentity();
+
+  // Interactive modal-form TUI: the human fills the form + picks the decision live.
+  if (parsed.bools.has("tui") || parsed.bools.has("interactive")) {
+    if (!process.stdout.isTTY) {
+      io.err(
+        "originate --tui requires an interactive terminal (TTY); use --product/--problem/--vision for the non-interactive run.",
+      );
+      return 2;
+    }
+    const result = await runOriginateInteractive({ cwd, commitMessage: parsed.flags.message });
+    return reportOriginateResult(result, io);
+  }
+
+  // Non-interactive: values come from flags.
   const values: Record<string, string> = {
     product: parsed.flags.product ?? "",
     problem: parsed.flags.problem ?? "",
@@ -593,12 +777,10 @@ async function cliOriginate(parsed: ParsedFlags, io: CliIO): Promise<number> {
   const missing = ORIGINATE_FIELDS.filter((name) => values[name]?.trim().length === 0);
   if (missing.length > 0) {
     io.err(`originate: missing required values: ${missing.map((m) => `--${m}`).join(", ")}`);
+    io.err("(or run `sibyl originate --tui` to fill the form interactively)");
     io.err(USAGE);
     return 2;
   }
-
-  const cwd = parsed.flags.cwd ?? process.cwd();
-  ensureGitIdentity();
 
   io.out(`sibyl: originating in ${cwd}`);
 
@@ -635,26 +817,7 @@ async function cliOriginate(parsed: ParsedFlags, io: CliIO): Promise<number> {
     },
   });
 
-  if (result.failure || !result.completion) {
-    io.err(`originate failed: ${result.failure?.detail ?? "run did not complete"}`);
-    return 1;
-  }
-
-  // Mirror the recalled decision log to disk so `decisions ls` can read it back
-  // across process invocations (the in-process store is per-run).
-  await mkdir(join(cwd, ".sibyl"), { recursive: true });
-  await writeFile(
-    join(cwd, DECISIONS_MIRROR),
-    `${JSON.stringify(result.decisions, null, 2)}\n`,
-    "utf8",
-  );
-
-  io.out(`artifacts: ${result.completion.artifacts.join(", ")}`);
-  io.out(`decisions: ${result.decisions.length}`);
-  for (const entry of result.decisions) {
-    io.out(`  - [${entry.phase}] ${entry.decision} (${entry.id})`);
-  }
-  return 0;
+  return reportOriginateResult(result, io);
 }
 
 async function cliDecisionsLs(parsed: ParsedFlags, io: CliIO): Promise<number> {
