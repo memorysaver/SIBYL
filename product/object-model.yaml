@@ -164,5 +164,5 @@ naming_decisions:
 provenance:
   generated_by: aep-map
   rounds_completed: ["O", "R"]
-  reviewed: false
-  reviewed_at: null
+  reviewed: true
+  reviewed_at: 2026-06-30

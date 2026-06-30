@@ -1,10 +1,10 @@
 schema: object-map/v1
 capability: guided-aep-journey-tui
-status: draft
-generated_by: aep-map
+status: approved
+generated_by: aep-model
 generated_at: 2026-06-30
-approved_at: null
-approved_by: null
+approved_at: 2026-06-30
+approved_by: human
 object_model_ref: product/object-model.yaml
 
 # Capability-scoped IA. v0 (Originate) objects only; the story-map objects

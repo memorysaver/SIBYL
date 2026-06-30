@@ -21,7 +21,14 @@ calibration:
     - layer: 3
       dimensions: ["object-model"]
       trigger: "Before building the story-mapping UI - auto-draft and human-approve the noun-first Object Map for the story-map objects (Story/Layer/Gate/Journey)."
-  history: []
+  history:
+    - dimension: object-model
+      calibrated_at: 2026-06-30
+      calibrated_from_layer: 0
+      mode: establishment
+      artifact_path: "product/maps/guided-aep-journey-tui/object-map.yaml"
+      sections_updated: ["stories"]
+      summary: "Approved object-first IA for guided-aep-journey-tui - 3 primary objects (Project/Vision/Agent Run), 1 task-flow exception (originate = task_oriented wizard). Story-map objects deferred to L3."
 
 # ─── ARCHITECTURE (System Map) ───────────────────────────────────
 architecture:
@@ -671,3 +678,10 @@ changelog:
       - topology
       - layer_gates
       - cost
+  - date: 2026-06-30
+    type: map_update
+    author: human
+    summary: "Model: approved the object-first Object Map for guided-aep-journey-tui (Project/Vision/Agent Run primary; Repo/Decision supporting; originate = task_oriented wizard). object-model.yaml reviewed. UI stories SIBYL-006/007 carry object_model_refs."
+    sections_changed:
+      - calibration
+      - stories
