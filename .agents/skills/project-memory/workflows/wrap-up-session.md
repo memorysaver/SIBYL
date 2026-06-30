@@ -27,9 +27,9 @@ Reference of what to put in each section (only fill the ones that exist):
 - **Spec Reference** — pointer to the spec (URL / path / short title). If still empty, fill from the conversation now.
 - **Mission** — one paragraph. What the user set out to do, in context.
 - **Prompt Evolution** — numbered list. Each turn where the user changed direction gets a one-line summary + a one-line "why it shifted" note. Skip minor clarifications.
-- **Steering & Course Corrections** — keep captured bullets; add any you missed. *User-driven* redirects only.
-- **Decisions Made** — keep captured bullets; add any you missed. *Agent-side* choices where the user was hands-off. Mundane is fine — mundane decisions explain why the code looks the way it does.
-- **Deviations** — keep captured bullets; add any you missed. Places the implementation intentionally departs from the spec, and *why*. Empty is a valid signal (followed the spec exactly).
+- **Steering & Course Corrections** — keep captured bullets; add any you missed. _User-driven_ redirects only.
+- **Decisions Made** — keep captured bullets; add any you missed. _Agent-side_ choices where the user was hands-off. Mundane is fine — mundane decisions explain why the code looks the way it does.
+- **Deviations** — keep captured bullets; add any you missed. Places the implementation intentionally departs from the spec, and _why_. Empty is a valid signal (followed the spec exactly).
 - **Tradeoffs** — keep captured bullets; add any you missed. Alternatives considered and why the chosen one won. Include rejected paths.
 - **What Worked** — concrete wins, with enough detail to reproduce.
 - **What Failed / Frustrations** — failures and root cause if knowable. If still unclear, write "unclear — suspect X" rather than inventing one.
@@ -44,6 +44,7 @@ Reference of what to put in each section (only fill the ones that exist):
 This is the one mode-gated step. Read the current `mode` from frontmatter:
 
 - **`mode: session`** — draft memory entries the user should consider promoting to `~/.claude/projects/.../memory/`. Format each one with full frontmatter so the user can copy-paste approve:
+
   ```
   - type: feedback
     name: integration_tests_real_db
@@ -51,6 +52,7 @@ This is the one mode-gated step. Read the current `mode` from frontmatter:
            Why: ...
            How to apply: ..."
   ```
+
   Only propose candidates that are genuinely durable rules. If the session didn't surface one, say so — empty is better than noise. Skip the section header if it doesn't exist in the file.
 
 - **`mode: spec`** — the Candidates section doesn't exist in the template; skip this step. Implementation notes are not durable cross-project rules. If a durable rule did emerge, either promote the session via `promote_to_session.sh` first (which adds the Candidates section), or capture it in a separate standard session later.
@@ -71,6 +73,7 @@ bash "$SKILL_DIR/scripts/update_index.sh" "<session-file-path>"
 ```
 
 The script:
+
 - Rewrites the row for this session in `_daily.md` (outcome column).
 - Appends a row to `_INDEX.md`'s Session Log with the date, session, mission, outcome, and the first takeaway bullet.
 
@@ -85,6 +88,7 @@ Fast no-op if nothing changed; safe no-op if qmd is not installed.
 ### 6. Report back to the user
 
 Print, concisely:
+
 - The session file path (so they can open it).
 - The outcome.
 - If the file has a `Candidates for memory save` section and you drafted any candidates, ask: "Want me to save any of these as memory?" (Don't auto-save.)

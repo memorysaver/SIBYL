@@ -4,7 +4,7 @@ Where does the forge write its extracted skills? It depends on how the host proj
 
 ## Why generic detection
 
-`memory-forge` is project-scoped — the extracted skills are loaded by whoever is working in *this* project next. The skill files have to land where the agent actually scans for skills. Different host projects use different layouts:
+`memory-forge` is project-scoped — the extracted skills are loaded by whoever is working in _this_ project next. The skill files have to land where the agent actually scans for skills. Different host projects use different layouts:
 
 - Some use the **canonical layout** (real `skills/` + symlinks under `.claude/skills`, `.agents/skills`).
 - Some have a **flat `.claude/skills/<name>/SKILL.md`** directly.

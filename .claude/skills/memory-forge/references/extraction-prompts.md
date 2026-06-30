@@ -17,7 +17,7 @@ Use both, in this order, in the forge prompt.
 >
 > Be ACTIVE — most forge passes produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
 >
-> If you decide there is genuinely nothing to consolidate, say so explicitly and name the reason (e.g. *"all 4 candidate lessons are below the 7-day pre-filter"*, *"no two lessons share a recurring theme yet"*). Silent no-op is not allowed.
+> If you decide there is genuinely nothing to consolidate, say so explicitly and name the reason (e.g. _"all 4 candidate lessons are below the 7-day pre-filter"_, _"no two lessons share a recurring theme yet"_). Silent no-op is not allowed.
 
 This half is responsible for making sure the pass doesn't shrug. It pairs with the cheap pre-filter (`select_lessons.sh`) — if the pre-filter passes lessons through, the LLM should act on them, not throw them away again.
 
@@ -43,12 +43,12 @@ This half is responsible for shape discipline. It pairs with the structured-summ
 
 For each cluster of lessons the forge is considering acting on, score it on these dimensions before deciding:
 
-| Dimension | Strong signal | Weak signal |
-|---|---|---|
-| **Recurrence** | ≥2 lessons across ≥2 different days describe the same root cause | A single dramatic session |
-| **Actionability** | A future agent can change behavior based on it (testable rule: "if X, do Y because Z") | Vague vibes ("be careful with auth") |
-| **Generality** | The rule applies across multiple files / features / contexts | The rule only matters for one specific file or PR |
-| **Counter-evidence** | No subsequent lesson contradicts it | A more recent lesson reverses the rule |
+| Dimension            | Strong signal                                                                          | Weak signal                                       |
+| -------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Recurrence**       | ≥2 lessons across ≥2 different days describe the same root cause                       | A single dramatic session                         |
+| **Actionability**    | A future agent can change behavior based on it (testable rule: "if X, do Y because Z") | Vague vibes ("be careful with auth")              |
+| **Generality**       | The rule applies across multiple files / features / contexts                           | The rule only matters for one specific file or PR |
+| **Counter-evidence** | No subsequent lesson contradicts it                                                    | A more recent lesson reverses the rule            |
 
 A cluster that scores **strong on Recurrence + Actionability** → bias toward action (consolidation or new umbrella).
 

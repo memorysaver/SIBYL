@@ -1,0 +1,62 @@
+{
+  "name": "SIBYL",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.2.2",
+      "zod": "^4.1.13",
+      "typescript": "^6",
+      "@types/node": "^22.13.14",
+      "@cloudflare/workers-types": "^4.20260621.1",
+      "hono": "^4.8.2",
+      "@orpc/server": "^1.14.6",
+      "@orpc/openapi": "^1.14.6",
+      "@orpc/zod": "^1.14.6",
+      "better-auth": "1.6.22",
+      "evlog": "^2.19.2",
+      "alchemy": "^0.91.2",
+      "wrangler": "^4.103.0",
+      "lucide-react": "^1.21.0",
+      "next-themes": "^0.4.6",
+      "react": "^19.2.7",
+      "react-dom": "^19.2.7",
+      "sonner": "^2.0.7",
+      "tailwindcss": "^4.3.1",
+      "@orpc/client": "^1.14.6",
+      "@types/react": "^19.2.17",
+      "@types/react-dom": "^19.2.3"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "dev:web": "turbo run dev -F web",
+    "dev:server": "turbo run dev -F server",
+    "db:generate": "turbo run db:generate -F @SIBYL/db",
+    "deploy": "turbo run deploy -F @SIBYL/infra",
+    "destroy": "turbo run destroy -F @SIBYL/infra",
+    "check": "oxlint && oxfmt --write"
+  },
+  "dependencies": {
+    "@SIBYL/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@SIBYL/config": "workspace:*",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "lefthook": "^2.1.9",
+    "oxfmt": "^0.53.0",
+    "oxlint": "^1.68.0",
+    "turbo": "^2.9.16",
+    "typescript": "catalog:"
+  },
+  "packageManager": "bun@1.2.18"
+}

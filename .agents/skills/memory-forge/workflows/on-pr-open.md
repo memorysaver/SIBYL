@@ -71,7 +71,7 @@ Use `gh pr comment <number> --body "..."` for this.
 If the structured summary is empty and the forge reports "no recurring theme yet" or "all candidates under pre-filter":
 
 - Skip the commit step. Don't create an empty forge commit.
-- Mention in the PR description: *"memory-forge: nothing to consolidate yet ($NEW lessons pending future passes)."*
+- Mention in the PR description: _"memory-forge: nothing to consolidate yet ($NEW lessons pending future passes)."_
 - Open the PR normally.
 
 If the user previously hand-edited a forged skill and the forge tried to overwrite it but was blocked by `check_human_edit.sh`:
@@ -81,6 +81,6 @@ If the user previously hand-edited a forged skill and the forge tried to overwri
 
 ## Why this lives in the same commit as the PR
 
-The forge is *about* this PR's work — the lessons it distills came from the sessions that produced this PR. Bundling them keeps the PR self-contained and lets the reviewer see the lesson → skill distillation in context. Splitting them into a separate "forge-only" PR adds review overhead without clarity.
+The forge is _about_ this PR's work — the lessons it distills came from the sessions that produced this PR. Bundling them keeps the PR self-contained and lets the reviewer see the lesson → skill distillation in context. Splitting them into a separate "forge-only" PR adds review overhead without clarity.
 
 If the project prefers separate "skill update" PRs by policy, see [`../references/trigger-recipes.md`](../references/trigger-recipes.md) — there's a CI recipe for that flow.

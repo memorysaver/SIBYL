@@ -11,13 +11,13 @@ mid-mission.**
 > **Mode is a capture-shape preset, not a partition.** Sections are additive:
 > a session can gain spec-axis sections at start (`--with-spec-axis`) or be
 > widened mid-mission with `promote_to_session.sh`. The frontmatter `mode`
-> field records the *current* preset, not a one-shot choice.
+> field records the _current_ preset, not a one-shot choice.
 
 ---
 
 ## 1. Routing: which mode does a new mission get?
 
-The agent picks `--mode=session` or `--mode=spec` *before* invoking
+The agent picks `--mode=session` or `--mode=spec` _before_ invoking
 `start_session.sh`. The script refuses to run without `--mode`, so this
 decision is forced.
 
@@ -65,13 +65,15 @@ decision is forced.
 ```
 
 **Signals that strongly suggest `spec`:**
+
 - User pasted or linked a spec and said "implement this" / "build this" /
   "follow this design".
 - Structured, prescriptive language ("must support X", "shall return Y").
 - Reference to an RFC, ADR, PRD, or "the spec".
 
 **Signals against `spec` (even if a spec is mentioned):**
-- Mission is to *debug* or *refactor* an existing implementation.
+
+- Mission is to _debug_ or _refactor_ an existing implementation.
 - The "spec" is vague brainstorming, not prescriptive.
 - Mission is exploratory ("let's see what we can do with…").
 

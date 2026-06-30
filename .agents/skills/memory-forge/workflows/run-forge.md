@@ -22,7 +22,7 @@ Resolve `$SKILL_DIR` to wherever this skill is installed. From here, every scrip
 SKILL_DIR="$(cd "$(readlink .claude/skills/memory-forge 2>/dev/null || echo .claude/skills/memory-forge)" && pwd -P)"
 ```
 
-If `project-memory/` doesn't exist, abort with a clear message: *"No project-memory/ found. Run the project-memory `bootstrap-memory` workflow first to create one, then come back."*
+If `project-memory/` doesn't exist, abort with a clear message: _"No project-memory/ found. Run the project-memory `bootstrap-memory` workflow first to create one, then come back."_
 
 ## Steps
 
@@ -42,8 +42,8 @@ bash "$SKILL_DIR/scripts/select_lessons.sh" --since-last-forge
 
 This returns lesson paths that are ≥7 days old AND newer than the last forge run. If empty:
 
-- If the most recent journal entry is <24 hours old → say *"Already forged today; nothing new under the 7-day pre-filter."* and stop.
-- Otherwise → say *"All N candidate lessons are <7 days old (still settling). Re-run after the pre-filter window."* Don't proceed.
+- If the most recent journal entry is <24 hours old → say _"Already forged today; nothing new under the 7-day pre-filter."_ and stop.
+- Otherwise → say _"All N candidate lessons are <7 days old (still settling). Re-run after the pre-filter window."_ Don't proceed.
 
 This is the "honest no-op" path. The pass must explain why it did nothing — silent no-op is the failure mode the skill is designed to fight.
 
@@ -58,7 +58,7 @@ The clusters are emitted as `## cluster` blocks. Each cluster has a `theme`, `me
 
 If zero clusters of size ≥2 emerge:
 
-- Say *"N qualifying lessons but no recurring theme yet (every lesson is unique). Re-run after more sessions accumulate."* Stop.
+- Say _"N qualifying lessons but no recurring theme yet (every lesson is unique). Re-run after more sessions accumulate."_ Stop.
 - Don't force a one-off skill from a singleton lesson. That's the "flat list = failure" failure mode.
 
 ### 4. Load extraction prompts
@@ -94,7 +94,7 @@ Apply the scoring rubric from [`../references/extraction-prompts.md`](../referen
 
 Produce a `## Structured summary` block following [`../references/structured-summary-schema.md`](../references/structured-summary-schema.md). Include the diagnostic fields (`lessons_considered`, `clusters_formed`, etc.) so future passes have comparable health metrics.
 
-If after Steps 5–6 the structured summary is empty (no consolidations, no new_skills, no prunings), include an explicit explanation above it naming which step produced the empty result. Example: *"3 clusters formed, but each one is dominated by counter-evidence in a more recent lesson. Routed to reconcile-conflicts.md."*
+If after Steps 5–6 the structured summary is empty (no consolidations, no new_skills, no prunings), include an explicit explanation above it naming which step produced the empty result. Example: _"3 clusters formed, but each one is dominated by counter-evidence in a more recent lesson. Routed to reconcile-conflicts.md."_
 
 ### 8. Dry-run, then apply
 
@@ -161,7 +161,7 @@ Print, concisely:
 - The number of lessons considered, clusters formed, and actions applied.
 - The paths of newly-created or modified skills (one per line).
 - The journal file path (for rollback).
-- A reminder to `git add` and commit: *"git add skills/ .claude/skills/ project-memory/.forge-journal/ && git commit -m 'forge: distill <N> lessons'"*
+- A reminder to `git add` and commit: _"git add skills/ .claude/skills/ project-memory/.forge-journal/ && git commit -m 'forge: distill <N> lessons'"_
 
 ## Don't
 

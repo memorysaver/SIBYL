@@ -12,6 +12,7 @@ rg -i "<pattern>" project-memory/lesson-learned/
 ```
 
 ## Running Themes
+
 <!-- Hand-curated on wrap-up. Each entry: theme → 1-2 sentences → links to source sessions.
      Keep this short. Promote patterns only after 2+ sessions show them. -->
 

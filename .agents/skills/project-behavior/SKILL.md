@@ -7,26 +7,26 @@ version: 0.1.0
 
 # project-behavior
 
-Bootstrap or extend a project's `AGENTS.md` with one or more *behavior packs* — short, opinionated preambles that set the rules agents must follow when working in the project. Karpathy's four-section preamble is included as the default pack; additional packs can be added by dropping more files into `references/`.
+Bootstrap or extend a project's `AGENTS.md` with one or more _behavior packs_ — short, opinionated preambles that set the rules agents must follow when working in the project. Karpathy's four-section preamble is included as the default pack; additional packs can be added by dropping more files into `references/`.
 
 ## When to invoke
 
 - Brand-new project that needs an `AGENTS.md` from scratch.
 - Existing `AGENTS.md` that lacks a behavioral preamble.
 - Switching or stacking behavior packs (e.g. add a security-focused pack on top of Karpathy).
-- Pairing with [`canonical-project-skills-layout`](../canonical-project-skills-layout/SKILL.md): that skill enforces the file *layout* (where `AGENTS.md` lives, that `CLAUDE.md` is `@AGENTS.md`); this skill controls the *content* of `AGENTS.md`.
+- Pairing with [`canonical-project-skills-layout`](../canonical-project-skills-layout/SKILL.md): that skill enforces the file _layout_ (where `AGENTS.md` lives, that `CLAUDE.md` is `@AGENTS.md`); this skill controls the _content_ of `AGENTS.md`.
 
 ## Workflow
 
 1. **Locate the guide.** Look for `<project>/AGENTS.md`. If it doesn't exist but `<project>/CLAUDE.md` does, ask whether to (a) rename/promote `CLAUDE.md` to `AGENTS.md` and replace `CLAUDE.md` with `@AGENTS.md`, or (b) write directly into `CLAUDE.md`. The canonical answer is (a); recommend it unless the user is on a Claude-only project.
 
-2. **Detect existing preamble.** Read the first ~30 lines of `AGENTS.md`. If the H1 is `# Agent behavioral guidelines` or any pack's first line is already present verbatim, *the preamble is installed* — skip ahead and ask whether to add another pack on top, swap it, or exit.
+2. **Detect existing preamble.** Read the first ~30 lines of `AGENTS.md`. If the H1 is `# Agent behavioral guidelines` or any pack's first line is already present verbatim, _the preamble is installed_ — skip ahead and ask whether to add another pack on top, swap it, or exit.
 
 3. **Pick pack(s).** List the files under `references/` to the user with a one-line summary of each. Default: `karpathy.md`. Allow multi-select for stacking.
 
 4. **Compose the preamble.** For each chosen pack, append its content in the order picked. Between packs and between the preamble and the rest of the file, insert a horizontal `---` separator on its own line.
 
-5. **Render to disk.** Use `Edit` (or `Write` only for new files). Prepend the composed preamble *before* the existing top-level H1 of the project. Preserve every byte of the existing project-specific content below the preamble.
+5. **Render to disk.** Use `Edit` (or `Write` only for new files). Prepend the composed preamble _before_ the existing top-level H1 of the project. Preserve every byte of the existing project-specific content below the preamble.
 
 6. **Verify.** Re-read the top of the file. Confirm the first H1 is `# Agent behavioral guidelines`, that each selected pack appears once, and that a `---` separates the preamble from the existing project content.
 

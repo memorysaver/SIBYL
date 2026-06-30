@@ -4,7 +4,7 @@ The forge prompt MUST end with a `## Structured summary` markdown section that c
 
 ## Top-level shape
 
-```markdown
+````markdown
 ## Structured summary
 
 ```yaml
@@ -15,7 +15,9 @@ new_skills:
 prunings:
   - <pruning entry>
 ```
-```
+````
+
+````
 
 A YAML fenced block inside the `## Structured summary` section. All three arrays are required keys (use `[]` if empty). Empty everywhere is allowed only when the pass also includes a top-level explanation of why (see [extraction-prompts.md](extraction-prompts.md)).
 
@@ -34,7 +36,7 @@ Append one or more lesson files to an existing umbrella skill's `references/` di
     Both sessions independently hit the same race condition.
     Adding to the existing cache-invalidation umbrella rather than creating a new
     skill, because the umbrella already covers the cache lifecycle.
-```
+````
 
 - `target_skill` is the slug of an existing skill in the host's detected skill root. The forge fails the entry (and reports it) if the target doesn't exist.
 - `references_filename` is the new file created under `<target_skill>/references/`. Conventional shape: `<YYYY-MM>-<short-topic>.md`.
@@ -86,8 +88,8 @@ The forge MUST stamp `origin: memory-forge`, `origin_hash`, `source_lessons`, `f
 Remove a previously-forged narrow skill and re-home it as a references file under a broader umbrella.
 
 ```yaml
-- source_skill: cache-busts-on-deploy        # narrow, previously forged
-  into_umbrella: deploy-coordination         # the broader umbrella
+- source_skill: cache-busts-on-deploy # narrow, previously forged
+  into_umbrella: deploy-coordination # the broader umbrella
   references_filename: 2026-05-cache-busts-on-deploy.md
   rationale: |
     cache-busts-on-deploy was forged as its own narrow skill, but the new
@@ -106,10 +108,10 @@ These may appear above the three arrays for context:
 
 ```yaml
 ran_at: 2026-05-23T14:02:00
-lessons_considered: 47          # how many qualifying lessons entered the cluster step
-clusters_formed: 6              # how many clusters emerged
-clusters_acted_on: 3            # how many produced a consolidation / new_skill / pruning
-skipped_by_pre_filter: 12       # how many lessons were <7 days old and skipped
+lessons_considered: 47 # how many qualifying lessons entered the cluster step
+clusters_formed: 6 # how many clusters emerged
+clusters_acted_on: 3 # how many produced a consolidation / new_skill / pruning
+skipped_by_pre_filter: 12 # how many lessons were <7 days old and skipped
 ```
 
 These are diagnostic — they're echoed by `apply_forge.sh` into the run log so multiple passes' health can be compared over time.

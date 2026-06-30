@@ -76,3 +76,86 @@ envision -> map -> design -> dispatch -> build -> reflect
 ```
 
 This document should remain compact until the system earns more detail. The next durable artifacts should be specifications, contracts, run-state definitions, and verification gates produced by the AEP process.
+
+---
+
+## Stack & Local Development
+
+The observer/control-surface web application is scaffolded with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack) as a Turborepo monorepo.
+
+- **TypeScript** — type safety across the monorepo
+- **TanStack Start** — SSR framework with TanStack Router
+- **TailwindCSS** + **shadcn/ui** — shared primitives in `packages/ui`
+- **Hono** — lightweight server framework
+- **oRPC** — end-to-end type-safe APIs with OpenAPI integration
+- **Cloudflare Workers** — runtime
+- **Drizzle** + **Cloudflare D1** (SQLite) — ORM and database
+- **Better Auth** — authentication
+- **Oxlint** + **Oxfmt** — linting & formatting
+- **Starlight** — Astro docs site (`apps/docs`)
+- **Turborepo** — monorepo build system
+
+### Getting Started
+
+Install dependencies:
+
+```bash
+bun install
+```
+
+Generate database migration files (Cloudflare D1 + Drizzle):
+
+```bash
+bun run db:generate
+```
+
+Start the development server:
+
+```bash
+bun run dev
+```
+
+Open [http://localhost:3001](http://localhost:3001) for the web app. The API runs at [http://localhost:3000](http://localhost:3000).
+
+> Runtime database access uses the Cloudflare `DB` binding from `packages/infra/alchemy.run.ts`. A local `DATABASE_URL`, if present, is only for database tooling. Alchemy provisions D1 and applies migrations during `dev` and `deploy`.
+
+### Project Structure
+
+```
+SIBYL/
+├── apps/
+│   ├── web/         # Frontend (React + TanStack Start)
+│   ├── docs/        # Documentation site (Astro Starlight)
+│   └── server/      # Backend API (Hono + oRPC)
+├── packages/
+│   ├── ui/          # Shared shadcn/ui components and styles
+│   ├── api/         # API layer / business logic
+│   ├── auth/        # Authentication configuration
+│   ├── db/          # Database schema & queries
+│   ├── env/         # Shared environment variables
+│   └── infra/       # Alchemy / Cloudflare infrastructure
+```
+
+### Available Scripts
+
+- `bun run dev` — start all applications in development mode
+- `bun run dev:web` — start only the web application
+- `bun run dev:server` — start only the server
+- `bun run build` — build all applications
+- `bun run check-types` — typecheck across all apps
+- `bun run db:generate` — generate database client/types
+- `bun run check` — run Oxlint and Oxfmt
+- `bun run deploy` — deploy to Cloudflare via Alchemy
+- `cd apps/docs && bun run dev` — start the documentation site
+
+### Adding shared UI components
+
+```bash
+npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
+```
+
+Import shared components:
+
+```tsx
+import { Button } from "@SIBYL/ui/components/button";
+```

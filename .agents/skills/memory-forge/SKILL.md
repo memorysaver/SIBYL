@@ -18,8 +18,8 @@ A consolidation pass reads `project-memory/lesson-learned/*/session-*.md`, clust
 
 **Core philosophy** (lifted from NousResearch's hermes-agent and held verbatim):
 
-- *Be ACTIVE. A pass that does nothing is a missed learning opportunity — not a neutral outcome.*
-- *A collection of hundreds of narrow skills where each one captures one session's specific bug is a FAILURE of the library — not a feature.*
+- _Be ACTIVE. A pass that does nothing is a missed learning opportunity — not a neutral outcome._
+- _A collection of hundreds of narrow skills where each one captures one session's specific bug is a FAILURE of the library — not a feature._
 
 These two opposing pressures together produce class-level skills with rich `references/`, not a flat list of one-shot entries.
 
@@ -32,7 +32,7 @@ These two opposing pressures together produce class-level skills with rich `refe
 
 ## Why this skill exists
 
-Lessons-learned without distillation just become a longer search query. The point is to convert recurring patterns into skills the *next* agent loads automatically — so the project's effective behaviour evolves with what's been learned, instead of relying on every future session to re-search the archive.
+Lessons-learned without distillation just become a longer search query. The point is to convert recurring patterns into skills the _next_ agent loads automatically — so the project's effective behaviour evolves with what's been learned, instead of relying on every future session to re-search the archive.
 
 NousResearch's [hermes-agent](https://github.com/nousresearch/hermes-agent) solves this with a two-tier loop: a per-turn capture pass plus a periodic curator that runs idle-only and is gated by inactivity. `project-memory` already covers the capture tier in a richer, git-committable shape. This skill is the curator tier — designed to be invoked, not silent, and to leave a paper trail in the repo.
 
@@ -100,12 +100,12 @@ Schema details in [references/extracted-skill-frontmatter.md](references/extract
 
 ## Triggers
 
-| Trigger | Mechanism |
-|---|---|
-| Explicit user request | Trigger phrases in the description: "forge a skill", "distill lessons", "extract skills from memory", "consolidate project-memory". |
-| Wrap-up proactive | `project-memory`'s `wrap-up-session.md` appends a step: if ≥3 new lessons since last forge, suggest running it. |
-| Age pre-filter | `select_lessons.sh` skips lessons younger than 7 days — pure shell, zero LLM cost. |
-| On PR open | `workflows/on-pr-open.md` runs the forge before `gh pr create` and commits any extracted skills onto the same branch. `references/trigger-recipes.md` includes a sample CI workflow that posts the structured summary as a PR comment. |
+| Trigger               | Mechanism                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explicit user request | Trigger phrases in the description: "forge a skill", "distill lessons", "extract skills from memory", "consolidate project-memory".                                                                                                    |
+| Wrap-up proactive     | `project-memory`'s `wrap-up-session.md` appends a step: if ≥3 new lessons since last forge, suggest running it.                                                                                                                        |
+| Age pre-filter        | `select_lessons.sh` skips lessons younger than 7 days — pure shell, zero LLM cost.                                                                                                                                                     |
+| On PR open            | `workflows/on-pr-open.md` runs the forge before `gh pr create` and commits any extracted skills onto the same branch. `references/trigger-recipes.md` includes a sample CI workflow that posts the structured summary as a PR comment. |
 
 The skill is **invoke-driven**, not silent. A forge pass always produces either a `## Structured summary` block with applied actions or an explicit "nothing to consolidate yet — N lessons under the 7-day pre-filter, M clusters too small" report. There is no third "did nothing, said nothing" outcome.
 

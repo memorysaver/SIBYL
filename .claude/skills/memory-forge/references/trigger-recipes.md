@@ -33,7 +33,7 @@ The `<invoke-the-agent-here>` step is where the LLM forge pass runs. In Claude C
 
 ## GitHub Actions — comment forge proposal on PR open
 
-If you want every PR to surface what the forge *would* do without auto-applying:
+If you want every PR to surface what the forge _would_ do without auto-applying:
 
 ```yaml
 # .github/workflows/memory-forge.yml
@@ -94,7 +94,7 @@ name: memory-forge weekly
 
 on:
   schedule:
-    - cron: '0 14 * * MON'  # Mondays 14:00 UTC
+    - cron: "0 14 * * MON" # Mondays 14:00 UTC
   workflow_dispatch:
 
 jobs:

@@ -10,7 +10,7 @@ Pull relevant lessons from the project's memory when the user asks a question wh
 - "What approach did we settle on for Y?"
 - A question where you suspect the answer is buried in prior sessions of the current project.
 
-Run this *before* answering from general knowledge — project memory is cheaper and more specific than you reconstructing from scratch.
+Run this _before_ answering from general knowledge — project memory is cheaper and more specific than you reconstructing from scratch.
 
 ## Steps
 
@@ -47,6 +47,7 @@ qmd search "<keywords>" -c "$COLLECTION"
 ```
 
 Return the top 5 results. For each, show:
+
 - The session file path (so the user can open it).
 - The mission (from frontmatter).
 - The one-line snippet qmd returned.

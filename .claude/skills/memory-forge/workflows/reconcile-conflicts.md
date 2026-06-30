@@ -1,6 +1,6 @@
 # Workflow: reconcile-conflicts
 
-When a new lesson contradicts an existing extracted skill — i.e. the project did something that *should* have triggered the forged skill, but the rule was actually wrong, or has since become wrong.
+When a new lesson contradicts an existing extracted skill — i.e. the project did something that _should_ have triggered the forged skill, but the rule was actually wrong, or has since become wrong.
 
 ## When this triggers
 
@@ -15,6 +15,7 @@ Don't try to consolidate a cluster with counter-evidence — the structured summ
 For each conflicting pair (existing-skill-or-lesson) ↔ (new-lesson), pick one of:
 
 ### Supersede
+
 The existing rule was wrong (or is now outdated). The new lesson should replace it.
 
 - If the existing rule is **in a forge-origin SKILL.md body** AND that SKILL.md is `untouched` (origin_hash matches): rewrite the SKILL.md body to reflect the new rule. Update `metadata.source_lessons` to include both the original sources and the new contradicting lesson. Re-run `record_origin_hash.sh` after the rewrite.
@@ -22,12 +23,14 @@ The existing rule was wrong (or is now outdated). The new lesson should replace 
 - If the existing rule is **in a references file**, not the SKILL.md body: append a new references file marked `type: superseding-evidence`. The original references file stays in place (history is preserved), but the new file documents the reversal.
 
 ### Narrow
+
 The existing rule was right in some cases but not all. The new lesson is an exception.
 
 - Append a references file marked `type: scope-narrowing` documenting the exception. Don't rewrite the SKILL.md body. The umbrella stays broad; the references file captures the narrow exception.
 - Update the SKILL.md `description:` to reflect the narrowing if the agent should now consider the exception during triggering.
 
 ### Branch
+
 The existing rule and the new lesson are both valid, but apply to genuinely different contexts that were previously conflated.
 
 - Split the existing umbrella into two: a new umbrella for the new context, with both umbrellas linked via `metadata.related_skills`. The old umbrella's body may need a clarifying note explaining which context it covers now.
@@ -98,6 +101,6 @@ Sometimes the conflict reveals that neither lesson is right — the original was
 
 - Don't consolidate either side.
 - Add a comment to **both** lessons' `Open Questions` section pointing to each other.
-- Emit no structured-summary entries for this cluster. Note it in the prompt-level analysis above the summary: *"Cluster X has counter-evidence on both sides; no resolution this pass. Both lessons annotated with Open Questions."*
+- Emit no structured-summary entries for this cluster. Note it in the prompt-level analysis above the summary: _"Cluster X has counter-evidence on both sides; no resolution this pass. Both lessons annotated with Open Questions."_
 
 This is one of the legitimate paths to an empty structured summary. The "be ACTIVE" prompt does not require fabricating a resolution where none exists; it requires not staying silent.

@@ -18,11 +18,11 @@ Before calling this, make sure `project-memory/_CONTEXT.md` exists (the umbrella
 
 `start_session.sh` requires `--mode=session` or `--mode=spec`. Decide before invoking it by reading the user's first message about the mission.
 
-**Pick `mode: spec` when *all* of the following are true:**
+**Pick `mode: spec` when _all_ of the following are true:**
 
 1. The user has provided (or pointed to) a written specification — PRD, RFC, ADR, design doc, formal feature spec, or similar prescriptive document.
 2. The mission is to **implement** that specification, not to debug, refactor, or extend existing code that already implements it.
-3. The most valuable thing to record is *how the implementation diverges from or interprets the spec* — not how the conversation evolved.
+3. The most valuable thing to record is _how the implementation diverges from or interprets the spec_ — not how the conversation evolved.
 
 **Otherwise, pick `mode: session`.** When unsure, pick `session` — it captures a superset of surfaces (steering, what worked, what failed, takeaways, candidates for memory save), so nothing is lost.
 
@@ -34,7 +34,7 @@ Before calling this, make sure `project-memory/_CONTEXT.md` exists (the umbrella
 
 **Signals against `spec` mode (even if the user mentioned a spec):**
 
-- The user is asking to *debug* or *refactor* an existing implementation of the spec.
+- The user is asking to _debug_ or _refactor_ an existing implementation of the spec.
 - The "spec" is vague brainstorming or a sketch, not a prescriptive document.
 - The mission is exploratory ("let's see what we can do with…", "play with this idea").
 
@@ -45,7 +45,7 @@ The gray-zone case — a mission that's part spec-implementation, part refactor/
 - `mode: spec` is too tight (no Steering, no What Worked, no Takeaways).
 - `mode: session` has no clean home for `Deviations` / `Tradeoffs` bullets.
 
-Use `mode: session` with `--with-spec-axis` (and optionally `--spec-ref=<pointer>`). The script seeds the full standard template *plus* the three spec-axis sections (Spec Reference, Deviations, Tradeoffs). The `spec_ref` frontmatter field is filled in. The session can run the full Candidates-for-memory-save flow at wrap-up while still capturing spec deviations contemporaneously.
+Use `mode: session` with `--with-spec-axis` (and optionally `--spec-ref=<pointer>`). The script seeds the full standard template _plus_ the three spec-axis sections (Spec Reference, Deviations, Tradeoffs). The `spec_ref` frontmatter field is filled in. The session can run the full Candidates-for-memory-save flow at wrap-up while still capturing spec deviations contemporaneously.
 
 Pick this when condition (1) of the spec-mode rule holds (a spec exists) but condition (2) or (3) fails (mission isn't pure implementation, or the conversation axis is also valuable).
 
