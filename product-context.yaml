@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.2.0"
 updated_at: 2026-06-30
-dispatch_epoch: 0
+dispatch_epoch: 1
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -217,7 +217,13 @@ architecture:
       failure_mode: "run_failed; resumable from decision log"
   deployment:
     environments: ["local"]
-    module_runtime: { "engine": "node-22.19", "renderer": "node-22.19", "tools": "node-22.19", "memory": "node-22.19" }
+    module_runtime:
+      {
+        "engine": "node-22.19",
+        "renderer": "node-22.19",
+        "tools": "node-22.19",
+        "memory": "node-22.19",
+      }
     persistence: { "decisions": "pi-session (appendEntry)" }
   amendment_log: []
   adrs:
@@ -251,7 +257,8 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: pending
+    status: ready
+    readiness_score: 0.9
     priority: critical
     business_value: 8
     complexity: M
@@ -355,7 +362,8 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: pending
+    status: ready
+    readiness_score: 0.9
     priority: high
     business_value: 7
     complexity: S
@@ -684,4 +692,14 @@ changelog:
     summary: "Model: approved the object-first Object Map for guided-aep-journey-tui (Project/Vision/Agent Run primary; Repo/Decision supporting; originate = task_oriented wizard). object-model.yaml reviewed. UI stories SIBYL-006/007 carry object_model_refs."
     sections_changed:
       - calibration
+      - stories
+  - date: 2026-06-30
+    type: dispatch
+    author: human
+    summary: >
+      Dispatch cascade: SIBYL-001 (engine bootstrap) and SIBYL-004 (narrow git
+      tool) have no dependencies -> transitioned pending->ready (Layer 0, Wave 1).
+      Both readiness 0.9 (launch-ready). Scored the queue; dispatch lock held
+      pending human go on starting the L0 build. dispatch_epoch -> 1.
+    sections_changed:
       - stories
