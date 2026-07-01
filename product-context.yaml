@@ -1,8 +1,8 @@
 schema: v1
 project: SIBYL
 version: "0.3.0"
-updated_at: 2026-07-01
-dispatch_epoch: 7
+updated_at: 2026-07-02
+dispatch_epoch: 8
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -679,10 +679,10 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 7
-    status: pending
+    status: in_progress
     readiness_score: 0.7
-    assigned_to: null
-    openspec_change: null
+    assigned_to: "feat/sibyl-011-agent-commit"
+    openspec_change: "SIBYL-011"
     priority: high
     business_value: 9
     complexity: S
@@ -861,6 +861,12 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: dispatch
+    author: human
+    summary: "Dispatched SIBYL-011 (cockpit agent-commit + decision capture) to a subagent (feat/sibyl-011-agent-commit) — the remaining L0 story. dispatch_epoch -> 8. Live dogfood will drive the real cockpit via microsoft/shell-use (agent-driven TTY) to re-flip the L0 gate."
+    sections_changed:
+      - stories
   - date: 2026-06-30
     type: initial
     author: human
