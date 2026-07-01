@@ -136,17 +136,19 @@ product:
 
   layers:
     - layer: 0
-      name: "Originate (walking skeleton)"
+      name: "Originate (walking skeleton) - agent cockpit"
       user_can: >
-        Launch SIBYL on nothing -> a modal form drives an imagine pass and constructs
-        README.md -> git init + local commit -> live progress renders in SIBYL's TUI
-        -> one decision-memory entry captured.
+        Launch SIBYL on nothing (`sibyl cockpit`) -> a fixed lazygit-style cockpit whose PRIMARY
+        area is the project (tabbed WYSIWYG: Goal/README, Story Map, ...) and whose SECONDARY area
+        is a chat driving a real Codex-backed agent -> you converse, the agent writes README.md
+        with its tools and (on your direction) git-commits it -> the Goal tab re-renders live and
+        the commit is captured as a decision.
       verification: >
-        From an empty dir, running SIBYL produces a committed README.md in a new local
-        git repo and >=1 pi.appendEntry decision entry, with live progress rendered,
-        without the user typing raw Pi or git commands.
+        From an empty dir, `sibyl cockpit` boots a real Codex agent; a guided conversation produces
+        a committed README.md in a new local git repo with the commit captured as >=1 decision
+        entry, the Goal tab rendering it live, without the user typing raw Pi or git commands.
       outcome_contract:
-        hypothesis: "If SIBYL can drive a Pi agent through a guided modal-form task that writes a real, committed artifact and captures a decision, the extension-driver engine + renderer seam are validated."
+        hypothesis: "If SIBYL can drive a real Pi agent through a guided CONVERSATION (chat) that writes a committed artifact and captures the commit decision - rendered live in a renderer-agnostic cockpit - the extension-driver engine + renderer seam are validated."
         success_metric:
           type: task_completion_rate
           target: ">= 80%"
@@ -155,7 +157,7 @@ product:
           otherwise: "reflect_and_reslice"
     - layer: 0.5
       name: "UX-flow alignment"
-      user_can: "(human alignment) calibrate the modal-form IA / layout."
+      user_can: "(human alignment) calibrate the cockpit IA / layout / conversation rhythm."
       outcome_contract: null
     - layer: 1
       name: "Scaffold (first /skill: drive - architecture-proof gate)"
