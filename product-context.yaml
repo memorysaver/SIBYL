@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 8
+dispatch_epoch: 9
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -718,10 +718,10 @@ stories:
     calibration_type: ux-flow
     object_model_refs: []
     slice: 1
-    status: pending
-    readiness_score: 0.55
-    assigned_to: null
-    openspec_change: null
+    status: in_progress
+    readiness_score: 0.75
+    assigned_to: "feat/sibyl-012-originate-skill"
+    openspec_change: "SIBYL-012"
     priority: medium
     business_value: 7
     complexity: M
@@ -743,7 +743,7 @@ stories:
       - "apps/harness/src/engine/session.ts"
       - "apps/harness/src/engine/conversation.ts"
       - "apps/harness/.agents/skills/ (new bundled originate skill)"
-    technical_notes: "The PERSONA half shipped 2026-07-02 as an L0.5 ux-flow calibration (SIBYL_PERSONA prepended in createSibylResourceLoader; tsc clean, 97 tests green; agent self-identifies as SIBYL live). The remaining SKILL-IFICATION half: move COCKPIT_GUIDE from an appendSystemPrompt brief to a Pi skill the agent discovers, bundle it (+ future AEP skills) into the `sibyl` CLI so the guide-through-to-full-AEP experience is built into the binary. Discovery: confirm how Pi bundles/ships skills with a packaged CLI vs `.agents/skills` walked from the git root."
+    technical_notes: "The PERSONA half shipped 2026-07-02 as an L0.5 ux-flow calibration (SIBYL_PERSONA prepended in createSibylResourceLoader; tsc clean, 97 tests green; agent self-identifies as SIBYL live). The remaining SKILL-IFICATION half: move COCKPIT_GUIDE from an appendSystemPrompt brief to a bundled Pi skill. DISCOVERY DONE (Pi SDK 0.80.2): a Pi skill = a `<name>/SKILL.md` with frontmatter {name, description, disable-model-invocation?}; `formatSkillsForPrompt` injects discovered skills into the system prompt as Agent-Skills XML (name+description; model can invoke, or `/skill:name`-only if disable-model-invocation). BUNDLING API: `DefaultResourceLoaderOptions.additionalSkillPaths: string[]` — pass a HARNESS-package-relative skills dir (resolved via import.meta.url, NOT the user cwd) so `sibyl cockpit` finds SIBYL's own skills in any project (today `discoverSkills` walks the USER's git root, which would MISS bundled skills). Also available: `skillsOverride`, `ResourceLoader.extendResources({skillPaths})`, `getAppendSystemPrompt()`. KEY DESIGN CALL for the subagent: the originate conductor behavior must be ACTIVE from turn 1 in the cockpit — since skills are normally invoke-on-demand, either keep a THIN appendSystemPrompt pointer ('you are in the originate cockpit; run the sibyl-originate skill') with the detailed guidance in the SKILL.md body, or prime/auto-invoke the skill on cockpit start. Validate live via shell-use (journey 01.2) that guided behavior is unchanged."
     verification:
       unit: ["persona present in the assembled system prompt / self-identification", "originate skill discovered by the loader"]
       integration: ["cockpit run loads the bundled originate skill (not the hardcoded brief)"]
@@ -905,6 +905,12 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: dispatch
+    author: human
+    summary: "Dispatched SIBYL-012 (L0.5: skill-ify guided-originate into a CLI-bundled Pi skill) to a subagent (feat/sibyl-012-originate-skill). dispatch_epoch -> 9. Persona half already shipped; this dispatch covers the skill-ification. Pi skill/bundling API discovery done up front (additionalSkillPaths + formatSkillsForPrompt) and recorded in the story's technical_notes; readiness 0.55 -> 0.75."
+    sections_changed:
+      - stories
   - date: 2026-07-02
     type: calibration
     author: human
