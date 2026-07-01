@@ -718,7 +718,7 @@ stories:
     calibration_type: ux-flow
     object_model_refs: []
     slice: 1
-    status: in_progress
+    status: completed
     readiness_score: 0.75
     assigned_to: "feat/sibyl-012-originate-skill"
     openspec_change: "SIBYL-012"
@@ -743,7 +743,7 @@ stories:
       - "apps/harness/src/engine/session.ts"
       - "apps/harness/src/engine/conversation.ts"
       - "apps/harness/.agents/skills/ (new bundled originate skill)"
-    technical_notes: "The PERSONA half shipped 2026-07-02 as an L0.5 ux-flow calibration (SIBYL_PERSONA prepended in createSibylResourceLoader; tsc clean, 97 tests green; agent self-identifies as SIBYL live). The remaining SKILL-IFICATION half: move COCKPIT_GUIDE from an appendSystemPrompt brief to a bundled Pi skill. DISCOVERY DONE (Pi SDK 0.80.2): a Pi skill = a `<name>/SKILL.md` with frontmatter {name, description, disable-model-invocation?}; `formatSkillsForPrompt` injects discovered skills into the system prompt as Agent-Skills XML (name+description; model can invoke, or `/skill:name`-only if disable-model-invocation). BUNDLING API: `DefaultResourceLoaderOptions.additionalSkillPaths: string[]` — pass a HARNESS-package-relative skills dir (resolved via import.meta.url, NOT the user cwd) so `sibyl cockpit` finds SIBYL's own skills in any project (today `discoverSkills` walks the USER's git root, which would MISS bundled skills). Also available: `skillsOverride`, `ResourceLoader.extendResources({skillPaths})`, `getAppendSystemPrompt()`. KEY DESIGN CALL for the subagent: the originate conductor behavior must be ACTIVE from turn 1 in the cockpit — since skills are normally invoke-on-demand, either keep a THIN appendSystemPrompt pointer ('you are in the originate cockpit; run the sibyl-originate skill') with the detailed guidance in the SKILL.md body, or prime/auto-invoke the skill on cockpit start. Validate live via shell-use (journey 01.2) that guided behavior is unchanged."
+    technical_notes: "The PERSONA half shipped 2026-07-02 as an L0.5 ux-flow calibration (SIBYL_PERSONA prepended in createSibylResourceLoader; tsc clean, 97 tests green; agent self-identifies as SIBYL live). The remaining SKILL-IFICATION half: move COCKPIT_GUIDE from an appendSystemPrompt brief to a bundled Pi skill. DISCOVERY DONE (Pi SDK 0.80.2): a Pi skill = a `<name>/SKILL.md` with frontmatter {name, description, disable-model-invocation?}; `formatSkillsForPrompt` injects discovered skills into the system prompt as Agent-Skills XML (name+description; model can invoke, or `/skill:name`-only if disable-model-invocation). BUNDLING API: `DefaultResourceLoaderOptions.additionalSkillPaths: string[]` — pass a HARNESS-package-relative skills dir (resolved via import.meta.url, NOT the user cwd) so `sibyl cockpit` finds SIBYL's own skills in any project (today `discoverSkills` walks the USER's git root, which would MISS bundled skills). Also available: `skillsOverride`, `ResourceLoader.extendResources({skillPaths})`, `getAppendSystemPrompt()`. KEY DESIGN CALL for the subagent: the originate conductor behavior must be ACTIVE from turn 1 in the cockpit — since skills are normally invoke-on-demand, either keep a THIN appendSystemPrompt pointer ('you are in the originate cockpit; run the sibyl-originate skill') with the detailed guidance in the SKILL.md body, or prime/auto-invoke the skill on cockpit start. Validate live via shell-use (journey 01.2) that guided behavior is unchanged. DONE + MERGED (a79fd2b -> main 1af90fe): bundled skill apps/harness/skills/sibyl-originate/SKILL.md; wired via additionalSkillPaths=fileURLToPath(new URL('../../skills', import.meta.url)) (harness-relative, cwd-independent); COCKPIT_GUIDE replaced by a thin COCKPIT_ORIGINATE_POINTER (approach a); package.json files:[src,skills]. 100 headless tests (+3, incl. discovery-from-outside-git-root), tsc clean. LIVE VALIDATED via shell-use from a cwd OUTSIDE the SIBYL repo: the agent ran `read .../skills/sibyl-originate/SKILL.md`, asked focusing questions, and PROACTIVELY drafted a structured README (title/## Problem/## Vision, focus reflected) — guided behavior unchanged, now sourced from the bundled skill. (Full draft->commit tail is unchanged SIBYL-011 machinery, proven live 3x; not re-captured in one session due to shell-use turn-timing races — the cockpit does not queue mid-turn input, confirming mid-run steering as a future refinement.)"
     verification:
       unit: ["persona present in the assembled system prompt / self-identification", "originate skill discovered by the loader"]
       integration: ["cockpit run loads the bundled originate skill (not the hardcoded brief)"]
@@ -905,6 +905,13 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: story_completed
+    author: human
+    summary: "SIBYL-012 COMPLETED (L0.5) — guided-originate is now a CLI-bundled Pi skill, not a hardcoded brief. Subagent merged a79fd2b -> main 1af90fe: apps/harness/skills/sibyl-originate/SKILL.md loaded via additionalSkillPaths (harness-relative, cwd-independent); COCKPIT_GUIDE -> thin COCKPIT_ORIGINATE_POINTER; SIBYL_PERSONA still first; 100 tests (+3), tsc clean. LIVE validated via shell-use from a cwd OUTSIDE the SIBYL repo: agent read the bundled SKILL.md, ran the focus-first interview, and proactively drafted a structured README — guided behavior unchanged, now sourced from the bundled skill. Establishes the packaging pattern for bundling the full AEP workflow into the sibyl CLI. Process note: the cockpit rejects concurrent prompts (no mid-turn input queueing) — confirms mid-run steer/followUp as a future refinement."
+    sections_changed:
+      - stories
+      - changelog
   - date: 2026-07-02
     type: dispatch
     author: human
