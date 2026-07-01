@@ -30,8 +30,9 @@
  * git tool, and the decision lands in memory.
  */
 
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type {
@@ -43,6 +44,11 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { ProcessTerminal, TUI } from "@earendil-works/pi-tui";
 
 import {
+  type Conversation,
+  type ConversationConnect,
+  createConversation,
+} from "./engine/conversation";
+import {
   createOriginateCore,
   COMMIT_CHOICE,
   type OriginateConnect,
@@ -52,6 +58,7 @@ import { createEngine, type EngineEvent, type EngineSeam, type Unsubscribe } fro
 import { bootSession } from "./engine/session";
 import { appendDecision, recallDecisions, type DecisionEntry } from "./memory/decisions";
 import { AgentRunView, createApp } from "./renderer/app";
+import { Cockpit, type ReadArtifact } from "./renderer/cockpit";
 import { createModalForm, ModalForm, ModalFormView } from "./renderer/modal-form";
 
 // ---------------------------------------------------------------------------
@@ -642,7 +649,112 @@ export async function runOriginateInteractive(
 }
 
 // ---------------------------------------------------------------------------
-// CLI: `sibyl --version` / `originate` / `decisions ls`.
+// Cockpit: a live, agent-driven project cockpit (`sibyl cockpit`).
+// ---------------------------------------------------------------------------
+
+/** A mounted cockpit: the live TUI + teardown. */
+export interface MountedCockpit {
+  readonly tui: TUI;
+  readonly cockpit: Cockpit;
+  readonly unsubscribe: () => void;
+  /** Unsubscribe from the conversation and stop the TUI render loop. */
+  stop(): void;
+}
+
+/** Read an artifact's on-disk text for the cockpit (v1: the Goal is `README.md`). */
+function cockpitArtifactReader(cwd: string): ReadArtifact {
+  return (tab) => {
+    if (tab !== "goal") {
+      return undefined;
+    }
+    try {
+      return readFileSync(join(cwd, "README.md"), "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+}
+
+/**
+ * Mount the cockpit into a live terminal: one {@link Cockpit} as the TUI's single
+ * child, subscribed to the {@link Conversation}. The ONLY code that touches a real
+ * TTY (`ProcessTerminal` raw mode); requires `process.stdout.isTTY`.
+ */
+export function mountCockpit(
+  conversation: Conversation,
+  options: { cwd: string; project?: string; onQuit?: () => void },
+): MountedCockpit {
+  const terminal = new ProcessTerminal();
+  const tui = new TUI(terminal);
+
+  const cockpit = new Cockpit({
+    tui,
+    project: options.project ?? (basename(options.cwd) || "project"),
+    dispatch: (command) => {
+      void conversation.dispatch(command);
+    },
+    readArtifact: cockpitArtifactReader(options.cwd),
+    onQuit: options.onQuit,
+  });
+
+  tui.addChild(cockpit);
+  tui.setFocus(cockpit);
+
+  const unsubscribe = conversation.subscribe((event) => {
+    cockpit.handle(event);
+    tui.requestRender();
+  });
+
+  tui.start();
+  tui.requestRender();
+
+  return {
+    tui,
+    cockpit,
+    unsubscribe,
+    stop(): void {
+      unsubscribe();
+      tui.stop();
+    },
+  };
+}
+
+/** Options for {@link runCockpitInteractive}. */
+export interface RunCockpitOptions {
+  /** The working directory the agent builds the project in. */
+  cwd: string;
+  /** Override the conversation connector (tests pass a scripted one). */
+  connect?: ConversationConnect;
+}
+
+/**
+ * Run the cockpit LIVE in a real terminal until the user quits (Ctrl-C). Boots a
+ * real Codex-backed conversation via the user's existing `~/.pi/agent` login;
+ * chat drives the agent, the agent edits the project's artifacts, and the Goal tab
+ * re-renders live. **Requires a TTY**.
+ */
+export async function runCockpitInteractive(options: RunCockpitOptions): Promise<void> {
+  const conversation = createConversation({ cwd: options.cwd, connect: options.connect });
+  const project = basename(options.cwd) || "project";
+
+  await new Promise<void>((resolve) => {
+    let done = false;
+    let mounted: MountedCockpit;
+    const finish = (): void => {
+      if (done) {
+        return;
+      }
+      done = true;
+      mounted.stop();
+      void conversation.dispose();
+      resolve();
+    };
+    mounted = mountCockpit(conversation, { cwd: options.cwd, project, onQuit: finish });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CLI: `sibyl --version` / `originate` / `cockpit` / `decisions ls`.
 // ---------------------------------------------------------------------------
 
 /** Sink for CLI output (overridable in tests). */
@@ -661,6 +773,7 @@ const USAGE = [
   "",
   "Usage:",
   "  sibyl --version",
+  "  sibyl cockpit [--cwd <dir>]                                                  # live agent project cockpit",
   "  sibyl originate --tui [--cwd <dir>] [--message <m>]                          # interactive modal-form TUI",
   "  sibyl originate --product <p> --problem <q> --vision <v> [--cwd <dir>] [--message <m>]   # non-interactive",
   "  sibyl decisions ls [--cwd <dir>]",
@@ -837,10 +950,23 @@ async function cliDecisionsLs(parsed: ParsedFlags, io: CliIO): Promise<number> {
   return 0;
 }
 
+/** `sibyl cockpit`: launch the live agent-driven project cockpit (requires a TTY). */
+async function cliCockpit(parsed: ParsedFlags, io: CliIO): Promise<number> {
+  const cwd = parsed.flags.cwd ?? process.cwd();
+  ensureGitIdentity(); // the agent may `git commit` via its tool
+  if (!process.stdout.isTTY) {
+    io.err("sibyl cockpit requires an interactive terminal (TTY).");
+    return 2;
+  }
+  await runCockpitInteractive({ cwd });
+  return 0;
+}
+
 /**
  * The CLI dispatcher backing the `sibyl` bin. Returns the process exit code.
  * `--version` prints `sibyl <semver>`; `originate` runs the non-interactive
- * walking skeleton; `decisions ls` reads the decision log mirror.
+ * walking skeleton; `cockpit` launches the live agent cockpit; `decisions ls`
+ * reads the decision log mirror.
  */
 export async function runCli(argv: readonly string[], io: CliIO = defaultIO): Promise<number> {
   const parsed = parseFlags(argv);
@@ -864,6 +990,8 @@ export async function runCli(argv: readonly string[], io: CliIO = defaultIO): Pr
   switch (command) {
     case "originate":
       return cliOriginate(parsed, io);
+    case "cockpit":
+      return cliCockpit(parsed, io);
     case "decisions":
       if (parsed.positional[1] === "ls" || parsed.positional[1] === undefined) {
         return cliDecisionsLs(parsed, io);

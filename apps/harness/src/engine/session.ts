@@ -22,6 +22,8 @@ export interface BootSessionOptions {
   sessionManager?: SessionManager;
   /** Engine-extension factories to bind. Default: `[createSibylEngineExtension()]`. */
   extensionFactories?: ExtensionFactory[];
+  /** Extra system-prompt fragments appended after the base prompt (e.g. a guided-flow brief). */
+  appendSystemPrompt?: string[];
 }
 
 export interface BootedSession {
@@ -41,6 +43,7 @@ function createSibylResourceLoader(
     cwd,
     agentDir: options.agentDir ?? getAgentDir(),
     extensionFactories: options.extensionFactories ?? [createSibylEngineExtension()],
+    ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
   });
 }
 
