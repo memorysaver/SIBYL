@@ -131,6 +131,7 @@ export class Cockpit implements Component {
   #openAssistant = false;
   #status: "idle" | "streaming" = "idle";
   #goalContent: string | undefined;
+  #decisionsContent: string | undefined;
 
   constructor(deps: CockpitDeps) {
     this.#theme = deps.theme ?? createTheme();
@@ -152,6 +153,7 @@ export class Cockpit implements Component {
     this.#chatPanel.setChild(this.#chatChild);
 
     this.#refreshArtifact("goal");
+    this.#refreshArtifact("decisions");
   }
 
   /** The currently active tab. */
@@ -269,6 +271,8 @@ export class Cockpit implements Component {
     if (tab === "goal") {
       this.#goalContent = this.#readArtifact("goal");
       this.#goalMarkdown.setText(this.#goalContent ?? "");
+    } else if (tab === "decisions") {
+      this.#decisionsContent = this.#readArtifact("decisions");
     }
   }
 
@@ -337,6 +341,11 @@ export class Cockpit implements Component {
         );
       }
       return fitLines(this.#goalMarkdown.render(innerWidth), height);
+    }
+    // Once the agent has committed, the Decisions tab renders the captured log
+    // (WYSIWYG) instead of the placeholder (SIBYL-011).
+    if (tab.id === "decisions" && this.#decisionsContent && this.#decisionsContent.trim().length > 0) {
+      return fitLines(wrap(this.#decisionsContent, innerWidth), height);
     }
     const stub = TAB_PLACEHOLDER[tab.id];
     return fitLines([t.muted(stub), "", t.dim("(coming soon)")], height);

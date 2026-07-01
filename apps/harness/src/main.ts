@@ -661,17 +661,40 @@ export interface MountedCockpit {
   stop(): void;
 }
 
-/** Read an artifact's on-disk text for the cockpit (v1: the Goal is `README.md`). */
-function cockpitArtifactReader(cwd: string): ReadArtifact {
+/**
+ * Format the accumulated cockpit decisions as a WYSIWYG log for the Decisions tab.
+ * Returns `undefined` while empty so the tab falls back to its placeholder.
+ */
+function formatDecisions(decisions: readonly DecisionEntry[]): string | undefined {
+  if (decisions.length === 0) {
+    return undefined;
+  }
+  const lines = ["# Decisions", ""];
+  for (const entry of decisions) {
+    lines.push(`- [${entry.phase}] ${entry.decision}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Read an artifact's current text for the cockpit: the Goal is `README.md` on
+ * disk; the Decisions tab formats the `decisions` the mount layer accumulates from
+ * `decision_captured` events (the conversation owns its own in-memory session, so
+ * the mount layer never sees its SessionManager directly).
+ */
+function cockpitArtifactReader(cwd: string, decisions: readonly DecisionEntry[]): ReadArtifact {
   return (tab) => {
-    if (tab !== "goal") {
-      return undefined;
+    if (tab === "goal") {
+      try {
+        return readFileSync(join(cwd, "README.md"), "utf8");
+      } catch {
+        return undefined;
+      }
     }
-    try {
-      return readFileSync(join(cwd, "README.md"), "utf8");
-    } catch {
-      return undefined;
+    if (tab === "decisions") {
+      return formatDecisions(decisions);
     }
+    return undefined;
   };
 }
 
@@ -687,13 +710,17 @@ export function mountCockpit(
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal);
 
+  // Decisions the agent captures mid-conversation (e.g. the README commit). The
+  // Decisions tab reads this accumulator through `cockpitArtifactReader`.
+  const decisions: DecisionEntry[] = [];
+
   const cockpit = new Cockpit({
     tui,
     project: options.project ?? (basename(options.cwd) || "project"),
     dispatch: (command) => {
       void conversation.dispatch(command);
     },
-    readArtifact: cockpitArtifactReader(options.cwd),
+    readArtifact: cockpitArtifactReader(options.cwd, decisions),
     onQuit: options.onQuit,
   });
 
@@ -701,6 +728,11 @@ export function mountCockpit(
   tui.setFocus(cockpit);
 
   const unsubscribe = conversation.subscribe((event) => {
+    // Accumulate captured decisions BEFORE handing the event to the cockpit, so the
+    // subsequent `artifact_changed{tab:"decisions"}` re-read sees the new entry.
+    if (event.type === "decision_captured") {
+      decisions.push(event.entry);
+    }
     cockpit.handle(event);
     tui.requestRender();
   });
