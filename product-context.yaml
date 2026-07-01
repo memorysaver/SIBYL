@@ -709,6 +709,46 @@ stories:
       integration: ["cockpit run -> committed README + persisted decision"]
       contract: []
 
+  - id: SIBYL-012
+    title: "CLI-native SIBYL skills: persona + guided-originate as a bundled skill (on-ramp to full AEP)"
+    layer: 0.5
+    module: engine
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: ux-flow
+    object_model_refs: []
+    slice: 1
+    status: pending
+    readiness_score: 0.55
+    assigned_to: null
+    openspec_change: null
+    priority: medium
+    business_value: 7
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-011"]
+    description:
+      what_changes: "Two moves, one direction — make SIBYL's agent behavior CLI-native, not hardcoded. (1) [DONE 2026-07-02] Lead the system prompt with a SIBYL PERSONA at the foundational bootSession level (SIBYL_PERSONA: 'the agentic coding-workflow agent, built on the Specification-Bound Intelligent Yield Loop'), so every session self-identifies as SIBYL doing software engineering, before any flow brief. (2) [PENDING] Evolve the cockpit's conductor behavior from a HARDCODED system-prompt string (COCKPIT_GUIDE) into a discoverable, SDK-driven SKILL bundled inside the `sibyl` CLI distribution — the agent LOADS the guided-originate skill (Pi skill discovery) instead of the harness embedding the brief in the binary. This establishes the packaging pattern for shipping the WHOLE AEP workflow (envision -> map -> ... ) as CLI-native driven skills."
+      why: "SIBYL's thesis is 'conduct AEP skills through the SDK, don't reimplement.' Guided-originate IS AEP step 0 (the README it produces is the /aep-envision context), so its logic belongs as a versionable, discoverable skill bundled with the CLI — not a string compiled into the harness. Bundling skills in the CLI is the on-ramp to integrating the full AEP workflow into `sibyl` itself. The persona-first framing is the UX foundation the user asked to land first."
+    acceptance_criteria:
+      - "The system prompt leads with the SIBYL persona; the agent self-identifies as SIBYL and frames tasks as software engineering. [DONE — validated live: agent answers 'SIBYL' + 'software'.]"
+      - "The guided-originate conductor behavior is loaded as a discoverable skill bundled with the `sibyl` CLI (Pi skill discovery), NOT a hardcoded COCKPIT_GUIDE string embedded in the binary."
+      - "The pattern generalizes: bundling a later AEP skill (e.g. envision) into the CLI needs no harness code change beyond registering/shipping the skill."
+    interface_obligations:
+      implements: []
+      consumes: ["bootSession appendSystemPrompt", "Pi skill discovery (DefaultResourceLoader)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/session.ts"
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/.agents/skills/ (new bundled originate skill)"
+    technical_notes: "The PERSONA half shipped 2026-07-02 as an L0.5 ux-flow calibration (SIBYL_PERSONA prepended in createSibylResourceLoader; tsc clean, 97 tests green; agent self-identifies as SIBYL live). The remaining SKILL-IFICATION half: move COCKPIT_GUIDE from an appendSystemPrompt brief to a Pi skill the agent discovers, bundle it (+ future AEP skills) into the `sibyl` CLI so the guide-through-to-full-AEP experience is built into the binary. Discovery: confirm how Pi bundles/ships skills with a packaged CLI vs `.agents/skills` walked from the git root."
+    verification:
+      unit: ["persona present in the assembled system prompt / self-identification", "originate skill discovered by the loader"]
+      integration: ["cockpit run loads the bundled originate skill (not the hardcoded brief)"]
+      contract: []
+
 # ─── WAVES (execution slices within Layer 0) ─────────────────────
 waves:
   - layer: 0
@@ -865,6 +905,14 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: calibration
+    author: human
+    dimension: ux-flow
+    summary: "L0.5 ux-flow — SIBYL PERSONA added to the FOUNDATIONAL system prompt (SIBYL_PERSONA prepended in bootSession/createSibylResourceLoader, ahead of any flow brief like COCKPIT_GUIDE): every session now self-identifies as SIBYL, the agentic coding-workflow agent built on the Specification-Bound Intelligent Yield Loop, and frames tasks as software engineering. Validated live via shell-use (agent answers 'SIBYL' + 'software'). tsc clean, 97 tests green. Created story SIBYL-012 (L0.5) to carry the remaining half: skill-ify guided-originate (hardcoded COCKPIT_GUIDE brief -> a CLI-bundled, SDK-driven Pi skill) as the on-ramp to shipping the full AEP workflow inside the `sibyl` CLI."
+    sections_changed:
+      - stories
+      - changelog
   - date: 2026-07-02
     type: calibration
     author: human

@@ -12,6 +12,21 @@ import {
 
 import { createSibylEngineExtension } from "./extension";
 
+/**
+ * SIBYL's foundational role, prepended to the system prompt of EVERY session
+ * (before any caller-supplied brief such as the cockpit's `COCKPIT_GUIDE`). It
+ * gives the agent its identity — SIBYL, an agentic coding-workflow agent running
+ * a Specification-Bound Intelligent Yield Loop — so it frames every task as
+ * software engineering, not open-ended chat. This is the UX foundation the
+ * guided flows build on; the flow-specific brief comes after it.
+ */
+export const SIBYL_PERSONA =
+  "You are SIBYL — the agentic coding-workflow agent, built on the Specification-Bound Intelligent " +
+  "Yield Loop. You carry out real SOFTWARE-ENGINEERING work: you take a specification and drive it to " +
+  "working, verified software through a disciplined, spec-bound loop — you CONDUCT that workflow rather " +
+  "than improvising it. Approach every task as a software-engineering task, grounded in the project's " +
+  "specs and artifacts.";
+
 export interface BootSessionOptions {
   /** Global Pi config dir (global skills/extensions). Default: `getAgentDir()` (~/.pi/agent). */
   agentDir?: string;
@@ -22,7 +37,11 @@ export interface BootSessionOptions {
   sessionManager?: SessionManager;
   /** Engine-extension factories to bind. Default: `[createSibylEngineExtension()]`. */
   extensionFactories?: ExtensionFactory[];
-  /** Extra system-prompt fragments appended after the base prompt (e.g. a guided-flow brief). */
+  /**
+   * Extra system-prompt fragments appended after the base prompt (e.g. a
+   * guided-flow brief). {@link SIBYL_PERSONA} is always prepended ahead of these,
+   * so the agent's SIBYL identity comes first and the flow brief follows.
+   */
   appendSystemPrompt?: string[];
 }
 
@@ -43,7 +62,9 @@ function createSibylResourceLoader(
     cwd,
     agentDir: options.agentDir ?? getAgentDir(),
     extensionFactories: options.extensionFactories ?? [createSibylEngineExtension()],
-    ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
+    // SIBYL_PERSONA is always first, so every session self-identifies as SIBYL
+    // before any flow-specific brief (e.g. COCKPIT_GUIDE) that a caller appends.
+    appendSystemPrompt: [SIBYL_PERSONA, ...(options.appendSystemPrompt ?? [])],
   });
 }
 
