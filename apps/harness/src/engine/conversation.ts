@@ -16,10 +16,15 @@
  * model.
  */
 
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentSessionEvent,
+  ExtensionAPI,
+  ExtensionFactory,
+} from "@earendil-works/pi-coding-agent";
 
 import { createSibylEngineExtension } from "./extension";
 import { bootSession } from "./session";
+import { appendDecision, type DecisionEntry } from "../memory/decisions";
 import { registerGitTool } from "../tools/git";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +47,7 @@ export type ConversationEvent =
       readonly isError?: boolean;
     }
   | { readonly type: "artifact_changed"; readonly tab: ArtifactTab }
+  | { readonly type: "decision_captured"; readonly entry: DecisionEntry }
   | { readonly type: "status"; readonly state: "idle" | "streaming" }
   | { readonly type: "error"; readonly detail: string };
 
@@ -95,14 +101,21 @@ export const COCKPIT_GUIDE = [
   "As the intent becomes clear, WRITE and iteratively refine `README.md` in the working directory using your tools:",
   "a clear title, a one-line pitch, a `## Problem` section, and a `## Vision` section. Revise it as you learn more.",
   "When the README reflects the user's intent, offer to commit it with git.",
+  "When the user asks you to commit (or approves committing), persist `README.md` YOURSELF with the `git` tool —",
+  "never ask the user to run a raw git command. First `git init` if the working directory is not yet a repo,",
+  "then `git add README.md`, then `git commit -m \"docs: add project README\"` (or a message reflecting the change).",
+  "Always pass the working directory as the tool's `cwd`.",
 ].join(" ");
+
+/** The run phase decisions captured in the cockpit are recorded under (mirrors main.ts). */
+const COCKPIT_PHASE = "originate";
 
 /** Tool names whose completion likely changed an on-disk artifact (→ re-read). */
 function isArtifactWritingTool(name: string): boolean {
   return /^(write|edit|multi_edit|apply_patch|create|git)/i.test(name);
 }
 
-/** A short human detail for a tool call (the target path, if any). */
+/** A short human detail for a tool call (the target path, or the git subcommand). */
 function toolDetail(args: unknown): string {
   if (args && typeof args === "object") {
     const record = args as Record<string, unknown>;
@@ -112,13 +125,93 @@ function toolDetail(args: unknown): string {
         return value;
       }
     }
+    // The git tool has no path; surface its subcommand so chat shows `git commit`.
+    if (typeof record.subcommand === "string" && record.subcommand.length > 0) {
+      return record.subcommand;
+    }
   }
   return "";
 }
 
+/** The git tool's `{subcommand, args}` recovered from a `tool_execution_start` args blob. */
+interface GitOp {
+  readonly subcommand: string;
+  readonly args: readonly string[];
+}
+
+/** Parse the narrow git tool's `{subcommand, args}` off a start-event args blob (or `undefined`). */
+function parseGitOp(args: unknown): GitOp | undefined {
+  if (args && typeof args === "object") {
+    const record = args as Record<string, unknown>;
+    if (typeof record.subcommand === "string") {
+      const list = Array.isArray(record.args)
+        ? record.args.filter((value): value is string => typeof value === "string")
+        : [];
+      return { subcommand: record.subcommand, args: list };
+    }
+  }
+  return undefined;
+}
+
+/** Pull the `-m` / `--message` value out of a `git commit`'s args, if present. */
+function commitMessageOf(args: readonly string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) {
+      continue;
+    }
+    if ((arg === "-m" || arg === "--message") && i + 1 < args.length) {
+      return args[i + 1];
+    }
+    if (arg.startsWith("-m") && arg.length > 2) {
+      return arg.slice(2);
+    }
+    if (arg.startsWith("--message=")) {
+      return arg.slice("--message=".length);
+    }
+  }
+  return undefined;
+}
+
+/** A human decision string for a README commit (e.g. `Committed README.md — "docs: …"`). */
+function describeCommit(args: readonly string[]): string {
+  const message = commitMessageOf(args);
+  return message ? `Committed README.md — "${message}"` : "Committed README.md";
+}
+
+/** Sink for a decision the agent makes mid-conversation (default: persist via `appendDecision`). */
+export type DecisionSink = (entry: DecisionEntry) => void;
+
 // ---------------------------------------------------------------------------
 // The live default connect: a real Codex-backed session.
 // ---------------------------------------------------------------------------
+
+/**
+ * Boot a real Codex-backed cockpit session: the SIBYL engine-extension + the
+ * narrow git tool bound, the guided cockpit brief appended to the system prompt.
+ * Auth + model come from the user's `~/.pi/agent` config. `onPi`, when supplied,
+ * receives the session's real `ExtensionAPI` so the default decision sink can
+ * persist commits via `appendDecision` (the same pi-capture trick `main.ts` uses).
+ */
+async function bootCockpitSession(
+  cwd: string,
+  onPi?: (pi: ExtensionAPI) => void,
+): Promise<ConversationSession> {
+  const extensionFactories: ExtensionFactory[] = [
+    createSibylEngineExtension(),
+    (pi) => registerGitTool(pi),
+  ];
+  if (onPi) {
+    extensionFactories.push((pi) => {
+      onPi(pi);
+    });
+  }
+  const { session } = await bootSession(cwd, {
+    extensionFactories,
+    appendSystemPrompt: [COCKPIT_GUIDE],
+  });
+  return session;
+}
 
 /**
  * The production connector: boots a real Pi `AgentSession` via {@link bootSession}
@@ -127,13 +220,7 @@ function toolDetail(args: unknown): string {
  * `openai-codex` login + `defaultModel`). Requires no login step when already
  * authenticated.
  */
-export const defaultConversationConnect: ConversationConnect = async (cwd) => {
-  const { session } = await bootSession(cwd, {
-    extensionFactories: [createSibylEngineExtension(), (pi) => registerGitTool(pi)],
-    appendSystemPrompt: [COCKPIT_GUIDE],
-  });
-  return session;
-};
+export const defaultConversationConnect: ConversationConnect = (cwd) => bootCockpitSession(cwd);
 
 // ---------------------------------------------------------------------------
 // The adapter: Pi AgentSessionEvent -> ConversationEvent.
@@ -145,11 +232,22 @@ export interface CreateConversationOptions {
   cwd: string;
   /** Override the session connector. Default: {@link defaultConversationConnect}. */
   connect?: ConversationConnect;
+  /**
+   * Sink for a decision the agent makes mid-conversation (currently: a README
+   * `git commit`). Default: persist via {@link appendDecision} to the
+   * `ExtensionAPI` of the booted session (captured while connecting). Tests inject
+   * a spy so the headless run needs no real `ExtensionAPI`.
+   */
+  captureDecision?: DecisionSink;
+  /** Timestamp source for captured decisions (deterministic in tests). Default: `Date.now`. */
+  now?: () => number;
 }
 
 class ConversationImpl implements Conversation {
   readonly #cwd: string;
   readonly #connect: ConversationConnect;
+  readonly #captureDecision: DecisionSink;
+  readonly #now: () => number;
   readonly #listeners = new Set<(event: ConversationEvent) => void>();
   readonly #abort = new AbortController();
 
@@ -157,12 +255,31 @@ class ConversationImpl implements Conversation {
   #connecting: Promise<ConversationSession> | undefined;
   #unsubscribeSession: (() => void) | undefined;
   #streaming = false;
-  /** Detail (target path) captured at `tool_execution_start`, reused on `_end`. */
+  /** The booted session's real `ExtensionAPI`, captured when the default connect runs. */
+  #capturedPi: ExtensionAPI | undefined;
+  /** Detail (target path / git subcommand) captured at `tool_execution_start`, reused on `_end`. */
   readonly #toolDetails = new Map<string, string>();
+  /** Git op captured at `tool_execution_start`, read back at `_end` to detect a commit. */
+  readonly #gitOps = new Map<string, GitOp>();
 
   constructor(options: CreateConversationOptions) {
     this.#cwd = options.cwd;
-    this.#connect = options.connect ?? defaultConversationConnect;
+    this.#now = options.now ?? Date.now;
+    // Default connect captures `pi` into this instance so the default sink can
+    // persist commits through the genuine `pi.appendEntry` path.
+    this.#connect =
+      options.connect ??
+      ((cwd) =>
+        bootCockpitSession(cwd, (pi) => {
+          this.#capturedPi = pi;
+        }));
+    this.#captureDecision =
+      options.captureDecision ??
+      ((entry) => {
+        if (this.#capturedPi) {
+          appendDecision(this.#capturedPi, entry);
+        }
+      });
   }
 
   subscribe(listener: (event: ConversationEvent) => void): () => void {
@@ -244,12 +361,22 @@ class ConversationImpl implements Conversation {
       case "tool_execution_start": {
         const detail = toolDetail(event.args);
         this.#toolDetails.set(event.toolCallId, detail);
+        // `tool_execution_end` carries NO args, so stash the git op here to detect
+        // a commit when it completes (mirrors the `#toolDetails` stash pattern).
+        if (event.toolName === "git") {
+          const gitOp = parseGitOp(event.args);
+          if (gitOp) {
+            this.#gitOps.set(event.toolCallId, gitOp);
+          }
+        }
         this.#emit({ type: "tool", name: event.toolName, phase: "start", detail });
         break;
       }
       case "tool_execution_end": {
         const detail = this.#toolDetails.get(event.toolCallId) ?? "";
         this.#toolDetails.delete(event.toolCallId);
+        const gitOp = this.#gitOps.get(event.toolCallId);
+        this.#gitOps.delete(event.toolCallId);
         this.#emit({
           type: "tool",
           name: event.toolName,
@@ -257,6 +384,12 @@ class ConversationImpl implements Conversation {
           detail,
           isError: event.isError === true,
         });
+        // A successful `git commit` is a captured DECISION: the user directed the
+        // agent to persist the README, and it did. Record it to decision-memory and
+        // surface it on the Decisions tab — the user typed no raw git command (SIBYL-011).
+        if (gitOp?.subcommand === "commit" && event.isError !== true) {
+          this.#captureCommitDecision(gitOp.args);
+        }
         if (isArtifactWritingTool(event.toolName)) {
           this.#emit({ type: "artifact_changed", tab: "goal" });
         }
@@ -271,6 +404,20 @@ class ConversationImpl implements Conversation {
       default:
         break;
     }
+  }
+
+  /** Persist a README-commit decision to memory and surface it on the Decisions tab. */
+  #captureCommitDecision(commitArgs: readonly string[]): void {
+    const at = this.#now();
+    const entry: DecisionEntry = {
+      id: `${COCKPIT_PHASE}-${at}`,
+      phase: COCKPIT_PHASE,
+      decision: describeCommit(commitArgs),
+      at,
+    };
+    this.#captureDecision(entry);
+    this.#emit({ type: "decision_captured", entry });
+    this.#emit({ type: "artifact_changed", tab: "decisions" });
   }
 
   #emit(event: ConversationEvent): void {

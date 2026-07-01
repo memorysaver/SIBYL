@@ -7,6 +7,7 @@ import {
   type ConversationSession,
   createConversation,
 } from "../src/engine/conversation";
+import type { DecisionEntry } from "../src/memory/decisions";
 
 /**
  * The conversation seam adapts the Pi `AgentSession` event stream into the small
@@ -114,6 +115,50 @@ function runScript(): AgentSessionEvent[] {
   ];
 }
 
+/** A run where the agent commits the README via the narrow `git` tool. */
+function commitScript(): AgentSessionEvent[] {
+  const message = assistantMessage("");
+  return [
+    { type: "agent_start" },
+    {
+      type: "tool_execution_start",
+      toolCallId: "g1",
+      toolName: "git",
+      args: { subcommand: "commit", args: ["-m", "docs: add project README"], cwd: "/tmp/ignored" },
+    },
+    {
+      type: "tool_execution_end",
+      toolCallId: "g1",
+      toolName: "git",
+      result: { exitCode: 0, stdout: "", stderr: "" },
+      isError: false,
+    },
+    { type: "agent_end", messages: [message], willRetry: false },
+  ];
+}
+
+/** A run where the agent only STAGES the README (`git add`) — not a decision. */
+function addScript(): AgentSessionEvent[] {
+  const message = assistantMessage("");
+  return [
+    { type: "agent_start" },
+    {
+      type: "tool_execution_start",
+      toolCallId: "g1",
+      toolName: "git",
+      args: { subcommand: "add", args: ["README.md"], cwd: "/tmp/ignored" },
+    },
+    {
+      type: "tool_execution_end",
+      toolCallId: "g1",
+      toolName: "git",
+      result: { exitCode: 0, stdout: "", stderr: "" },
+      isError: false,
+    },
+    { type: "agent_end", messages: [message], willRetry: false },
+  ];
+}
+
 function collect(): {
   events: ConversationEvent[];
   fake: FakeAgentSession;
@@ -171,6 +216,59 @@ describe("conversation seam — AgentSessionEvent → ConversationEvent", () => 
     await conversation.dispatch({ type: "send", text: "hi" }); // connect first
     await conversation.dispatch({ type: "abort" });
     expect(fake.aborted).toBe(true);
+    await conversation.dispose();
+  });
+
+  it("captures a git commit of the README as a decision and surfaces the Decisions tab", async () => {
+    const fake = new FakeAgentSession(commitScript);
+    const captured: DecisionEntry[] = [];
+    const conversation = createConversation({
+      cwd: "/tmp/ignored",
+      connect: async () => fake,
+      // Inject a spy sink so the headless run needs no real ExtensionAPI.
+      captureDecision: (entry) => captured.push(entry),
+      now: () => 1_719_000_000_000,
+    });
+    const events: ConversationEvent[] = [];
+    conversation.subscribe((event) => events.push(event));
+
+    await conversation.dispatch({ type: "send", text: "commit the readme" });
+
+    // AC2: exactly one decision-memory entry, sensibly shaped.
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toEqual({
+      id: "originate-1719000000000",
+      phase: "originate",
+      decision: 'Committed README.md — "docs: add project README"',
+      at: 1_719_000_000_000,
+    });
+
+    // AC3: the capture is surfaced — a `decision_captured` event carrying the entry
+    // plus an `artifact_changed{tab:"decisions"}` so the Decisions tab re-renders.
+    const decisionEvent = events.find((e) => e.type === "decision_captured");
+    expect(decisionEvent).toEqual({ type: "decision_captured", entry: captured[0] });
+    expect(events.some((e) => e.type === "artifact_changed" && e.tab === "decisions")).toBe(true);
+
+    await conversation.dispose();
+  });
+
+  it("does NOT capture a decision for a non-commit git op (git add)", async () => {
+    const fake = new FakeAgentSession(addScript);
+    const captured: DecisionEntry[] = [];
+    const conversation = createConversation({
+      cwd: "/tmp/ignored",
+      connect: async () => fake,
+      captureDecision: (entry) => captured.push(entry),
+    });
+    const events: ConversationEvent[] = [];
+    conversation.subscribe((event) => events.push(event));
+
+    await conversation.dispatch({ type: "send", text: "stage the readme" });
+
+    expect(captured).toHaveLength(0);
+    expect(events.some((e) => e.type === "decision_captured")).toBe(false);
+    expect(events.some((e) => e.type === "artifact_changed" && e.tab === "decisions")).toBe(false);
+
     await conversation.dispose();
   });
 

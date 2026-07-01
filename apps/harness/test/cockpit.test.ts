@@ -125,6 +125,31 @@ describe("Cockpit — fixed layout, tab framework, chat driver", () => {
     expect(out).toContain("● thinking"); // streaming chip in the header
   });
 
+  it("renders captured decisions on the Decisions tab instead of the placeholder", () => {
+    const decisionsDoc =
+      '# Decisions\n\n- [originate] Committed README.md — "docs: add project README"\n';
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal()),
+      theme: createTheme({ color: false }),
+      dispatch: () => {},
+      readArtifact: (tab) =>
+        tab === "goal" ? README : tab === "decisions" ? decisionsDoc : undefined,
+    });
+
+    // The agent's commit fires an artifact change; the tab re-reads its log.
+    cockpit.handle({ type: "artifact_changed", tab: "decisions" });
+
+    // Goal → Story Map → Architecture → Decisions.
+    cockpit.handleInput("\t");
+    cockpit.handleInput("\t");
+    cockpit.handleInput("\t");
+    expect(cockpit.activeTab.id).toBe("decisions");
+
+    const out = cockpit.render(100).join("\n");
+    expect(out).toContain("Committed README.md");
+    expect(out).not.toContain("decision-memory log will render here"); // placeholder gone
+  });
+
   it("dispatches a send command when the user submits the chat input", () => {
     const commands: ConversationCommand[] = [];
     const cockpit = new Cockpit({
