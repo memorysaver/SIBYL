@@ -1,8 +1,8 @@
 schema: v1
 project: SIBYL
-version: "0.2.0"
-updated_at: 2026-06-30
-dispatch_epoch: 6
+version: "0.3.0"
+updated_at: 2026-07-01
+dispatch_epoch: 7
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -496,7 +496,7 @@ stories:
     files_affected:
       - "apps/harness/src/renderer/app.ts"
       - "apps/harness/src/renderer/progress.ts"
-    technical_notes: "pi-tui components (Box/Text/Loader/Markdown). Verify raw-TTY behavior under the chosen runtime."
+    technical_notes: "pi-tui components (Box/Text/Loader/Markdown). Verify raw-TTY behavior under the chosen runtime. SUPERSEDED by the L0 re-slice (2026-07-01): the form-mode shell is legacy; the live UX is the cockpit (SIBYL-010)."
     verification:
       unit: ["mode state machine"]
       integration: ["renders a scripted EngineEvent stream"]
@@ -540,7 +540,7 @@ stories:
       contract_tests_required: false
     files_affected:
       - "apps/harness/src/renderer/modal-form.ts"
-    technical_notes: "object_model_refs bind to Vision + Project; respect the approved Object Map IA."
+    technical_notes: "object_model_refs bind to Vision + Project; respect the approved Object Map IA. SUPERSEDED by the L0 re-slice (2026-07-01): the modal form is legacy; the live UX is the cockpit chat (SIBYL-010)."
     verification:
       unit: ["field collection -> submit_form payload"]
       integration: ["form -> decision -> submit round-trip against a stub engine"]
@@ -586,6 +586,127 @@ stories:
     verification:
       unit: []
       integration: ["empty dir -> committed README + >=1 decision, no manual commands"]
+      contract: []
+
+  # ─── Layer-0 RE-SLICE (2026-07-01): the agent COCKPIT replaces the modal form as the
+  #     walking skeleton. SIBYL-006/007 (modal-form UI) are superseded/legacy; the CLI
+  #     originate path (SIBYL-008) still works headlessly. SIBYL-011 completes the revised
+  #     outcome contract and re-flips the L0 gate.
+  - id: SIBYL-009
+    title: "Cockpit conversation seam + real Codex agent integration"
+    layer: 0
+    module: engine
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 6
+    status: completed
+    readiness_score: 0.9
+    assigned_to: "feat/cockpit-agent-skeleton"
+    openspec_change: "SIBYL-009"
+    priority: critical
+    business_value: 10
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-001", "SIBYL-002"]
+    description:
+      what_changes: "A renderer-agnostic conversation seam (ConversationEvent/Command) + createConversation adapter boots a real Codex-backed Pi AgentSession (existing ~/.pi/agent openai-codex OAuth + default model), gates tools (read/grep/find/ls/write/edit/git), injects a guided system prompt, and maps AgentSessionEvent -> cockpit events."
+      why: "Proves the L0 architectural bet in the conversational shape: the engine drives a REAL agent; the SDK stays out of the renderer."
+    acceptance_criteria:
+      - "createConversation boots a real AgentSession and gates it to COCKPIT_TOOLS."
+      - "The AgentSessionEvent stream maps to ConversationEvents (deltas, tool start/end, artifact_changed, status)."
+      - "No Pi SDK import exists in the renderer (renderer-no-pi-sdk scan green)."
+    interface_obligations:
+      implements: ["conversation seam (ConversationEvent/ConversationCommand)"]
+      consumes: ["Pi AgentSession"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/src/engine/session.ts"
+    technical_notes: "Codex login confirmed live (pi --print --provider openai-codex). Merged via feat/cockpit-agent-skeleton (870ddde)."
+    verification:
+      unit: ["scripted AgentSession -> ConversationEvent mapping"]
+      integration: []
+      contract: []
+  - id: SIBYL-010
+    title: "Cockpit renderer - fixed lazygit layout (tabbed project WYSIWYG + chat driver)"
+    layer: 0
+    module: renderer
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 6
+    status: completed
+    readiness_score: 0.9
+    assigned_to: "feat/cockpit-agent-skeleton"
+    openspec_change: "SIBYL-010"
+    priority: critical
+    business_value: 10
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-009"]
+    description:
+      what_changes: "A fixed cockpit renderer: header + PRIMARY tab panel (Goal renders README.md live via pi-tui Markdown; Story Map/Architecture/Decisions are placeholders) + SECONDARY chat panel (sole driver) + footer. Tab switches tabs; Ctrl-C quits. `sibyl cockpit` mounts it."
+      why: "The signature UX: the project itself is the primary view; chat drives it. Supersedes the modal-form UI (SIBYL-006/007)."
+    acceptance_criteria:
+      - "The full 4-tab framework renders with the active tab highlighted."
+      - "The Goal tab renders README.md WYSIWYG and re-reads on artifact_changed."
+      - "The chat panel streams user/assistant/tool activity; Enter dispatches send; Ctrl-C quits."
+    interface_obligations:
+      implements: []
+      consumes: ["conversation seam (ConversationEvent/ConversationCommand)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/renderer/cockpit.ts"
+      - "apps/harness/src/renderer/theme.ts"
+      - "apps/harness/src/renderer/panel.ts"
+      - "apps/harness/src/main.ts"
+    technical_notes: "theme.ts/panel.ts cherry-picked from the shelved fix/originate-tui-vibrant-shell. Live vibrant render human-verified in a TTY."
+    verification:
+      unit: ["headless layout: width invariant, tab framework, Goal markdown, chat stream, tab-switch, Ctrl-C"]
+      integration: []
+      contract: []
+  - id: SIBYL-011
+    title: "Cockpit: agent commits the README + capture the commit as a decision"
+    layer: 0
+    module: engine
+    activity: originate
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 7
+    status: pending
+    readiness_score: 0.7
+    assigned_to: null
+    openspec_change: null
+    priority: high
+    business_value: 9
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-009", "SIBYL-010", "SIBYL-005"]
+    description:
+      what_changes: "On the user directing the agent to commit (via chat), the agent git-commits README.md via its tool; the harness captures that commit as a decision-memory entry (pi.appendEntry) and surfaces it (Decisions tab / chat confirmation)."
+      why: "Closes the REVISED L0 outcome contract: guided conversation -> committed artifact -> captured decision (decision = the user directing the commit, captured from the git commit)."
+    acceptance_criteria:
+      - "A cockpit run where the user asks to commit produces a real git commit of README.md in the run cwd."
+      - ">=1 decision-memory entry is persisted capturing that commit decision, recallable."
+      - "The commit + decision are reflected in the cockpit; the user types no raw Pi/git commands."
+    interface_obligations:
+      implements: []
+      consumes: ["conversation seam", "engine -> memory (appendDecision)", "git tool"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/src/main.ts"
+    technical_notes: "The remaining L0-completing story after the re-slice; dispatch to a subagent (regular AEP workflow). Its dogfood re-flips the L0 gate to passed."
+    verification:
+      unit: ["commit-decision capture with a scripted agent"]
+      integration: ["cockpit run -> committed README + persisted decision"]
       contract: []
 
 # ─── WAVES (execution slices within Layer 0) ─────────────────────
@@ -689,6 +810,9 @@ topology:
       - pattern: "L0 UI stories' acceptance criteria were satisfiable by the HEADLESS path (committed README + decision + scripted progress + no raw commands), so tests passed + auto-merged WITHOUT the interactive modal-form UI being launchable - ADR-003's signature UX slipped past the autopilot gate."
         mitigation: "For UI stories, an acceptance criterion MUST require the interactive surface to be LAUNCHABLE + dogfooded (the Tier-2 journey drives the REAL UI), not just the headless controller logic. The human gate caught it; encode it as a criterion so the machine does too."
         discovered_at: 2026-06-30
+      - pattern: "The L0 modal-form UX was built + validated, then the human re-conceived the core interaction as a guided AGENT CONVERSATION (cockpit), not a form - a Discovery that RE-SLICED L0 rather than re-envisioning it (same backbone/activity + architectural bet)."
+        mitigation: "For a signature UX, get the interaction MODEL in front of the human as a runnable slice EARLY, before hardening it - treat the first UX build as a probe. A re-slice is cheap and expected. The engine<->renderer seam abstraction made the pivot low-cost: a new conversation seam, same architecture, SDK still out of the renderer."
+        discovered_at: 2026-07-01
   handoffs:
     - from: implementer
       to: evaluator
@@ -703,11 +827,12 @@ topology:
 # ─── LAYER GATES ─────────────────────────────────────────────────
 layer_gates:
   - layer: 0
-    # scripted_passed = machinery + Tier-2 cli dogfood green pre-merge. The two-phase flip to
-    # `passed` (formal 22-criterion coverage matrix + qualitative outcome-contract eval) is the
-    # HUMAN gate step: /aep-wrap (flip) + /aep-reflect (outcome). full_auto:false => it pauses here.
-    status: scripted_passed
-    test_definition: "From an empty dir, SIBYL drives the modal-form imagine pass, writes + commits README.md in a new local git repo, persists >=1 decision entry, renders live progress, with no raw commands typed."
+    # RE-SLICED 2026-07-01: the walking skeleton is now the agent COCKPIT (`sibyl cockpit`),
+    # not the modal form. The modal-form skeleton (SIBYL-006/007/008) validated the seam and
+    # remains as the headless CLI path, but the L0 gate is RE-OPENED until the cockpit meets the
+    # REVISED outcome contract (SIBYL-011: agent-commit + decision capture) and is dogfooded.
+    status: re_sliced
+    test_definition: "From an empty dir, `sibyl cockpit` boots a real Codex agent; a guided conversation writes + commits README.md in a new local git repo, captures the commit as >=1 decision, renders the Goal tab live, with no raw commands typed."
     journeys:
       - skills/e2e-test/journeys/00-walking-skeleton.md
     coverage:
@@ -911,5 +1036,48 @@ changelog:
       verdict: pending_human_handson
     cost_observations: "8 worker runs (+ resumes after transient API blips); ~100-160k subagent tokens each. Startup-hiccup resumes added overhead but zero rework. No telemetry (qualitative L0)."
     sections_changed:
+      - topology
+      - changelog
+  - date: 2026-07-01
+    type: reflection
+    author: human
+    summary: "L0 RE-SLICE: the walking skeleton is re-conceived as an agent-driven project cockpit (`sibyl cockpit`); the modal-form UI is legacied; the L0 outcome contract is revised to the conversational shape."
+    feedback:
+      bugs: []
+      refinements:
+        - description: "Replace the modal-form originate UX with a fixed lazygit cockpit (primary = tabbed project WYSIWYG; secondary = chat driving a real Codex agent). Walking skeleton built + merged; Goal tab renders README live."
+          story_id: "SIBYL-009,SIBYL-010"
+          target_layer: 0
+          status: done
+        - description: "Close the revised L0 contract: the agent commits the README + the commit is captured as a decision."
+          story_id: "SIBYL-011"
+          target_layer: 0
+          status: pending
+      discoveries:
+        - description: "The guided originate task is a CONVERSATION, not a modal form. Same backbone/activity + architectural bet -> a re-slice of L0, not a re-envision. Codex login (Pi openai-codex OAuth, ChatGPT subscription) is already set up; the real agent path was ~free to wire."
+          affected_section: product
+          for_layer: 0
+      calibration:
+        - description: "Cockpit IA / layout / conversation rhythm - ux-flow calibration once the skeleton settles."
+          dimension: ux-flow
+          target_layer: 0.5
+      opportunity_shifts: []
+    outcome_evaluation:
+      layer: 0
+      hypothesis: "engine + renderer seam validated by driving a real Pi agent through a guided CONVERSATION that writes a committed artifact + captures the commit decision, rendered live in a renderer-agnostic cockpit"
+      metric: "task_completion_rate >= 80%"
+      assessment: >
+        Architectural bet HOLDS under the new shape: the cockpit proves the engine drives a REAL
+        Codex agent and streams to a renderer-agnostic seam (conversation.ts is the seam; cockpit.ts
+        is SDK-free, renderer-no-pi-sdk green). Skeleton merged (SIBYL-009/010): a guided chat + a
+        live README tab, 94 headless tests green + tsc clean. Contract NOT yet fully met - the commit
+        + decision-capture (SIBYL-011) is the remaining L0 story; the gate is re_sliced until it
+        lands + is dogfooded.
+      verdict: reslice_in_progress
+    cost_observations: "3 Explore agents (codex-auth / session-wiring / agent-capability) + 1 build pass; theme.ts/panel.ts reused from the shelved modal-form branch."
+    sections_changed:
+      - product
+      - stories
+      - layer_gates
       - topology
       - changelog
