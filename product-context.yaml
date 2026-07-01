@@ -866,6 +866,13 @@ cost:
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
   - date: 2026-07-02
+    type: calibration
+    author: human
+    dimension: ux-flow
+    summary: "L0.5 ux-flow calibration — COCKPIT_GUIDE now directs the agent to PROACTIVELY offer/draft README.md once a couple of focusing exchanges give it product+problem+vision (instead of waiting to be told), then keep refining; also frames the README as the /aep-envision context ('what to build'). Validated live via shell-use (journey 01.2 re-run): a vague opener drew 3 focusing questions, then the agent drafted 'PR Context Keeper' UNPROMPTED and continued refining. tsc clean, 97 tests green. Commit path unchanged."
+    sections_changed:
+      - changelog
+  - date: 2026-07-02
     type: outcome_evaluation
     author: human
     summary: "Layer 0 outcome contract PASSED — cockpit met the revised conversational contract under a live dogfood driven headlessly via microsoft/shell-use. L0 gate re_sliced -> passed."
