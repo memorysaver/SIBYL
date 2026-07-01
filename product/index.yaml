@@ -25,7 +25,7 @@ opportunity:
     - "TUI-first contradicts the manifesto's 'not dashboard-first'. RESOLVED: update the README to TUI-first; story-mapping<->AEP-workflow alignment is the key to success."
     - "Two moving upstreams (Pi + AEP) cause recurring rework. RESOLVED: AEP leads, SIBYL follows until it can autopilot most agentic-engineering missions."
     - "Visualization buys observability, not determinism. RESOLVED: goal reframed to legible/observable; determinism is a separate later claim via gates/constraints/replayable decision memory."
-    - "Layer 0 validates the engine, not the legibility bet, and does not exercise the /skill: mechanism until L1. ACCEPTED RISK: origination-first is the deliberate product story; /skill: is proven at L1 (scaffold); legibility at L3 (story-map)."
+    - "Layer 0 validates the engine, not the legibility bet, and does not exercise the /skill: mechanism until L1. ACCEPTED RISK: origination-first is the deliberate product story; /skill: is proven at L1 (envision, re-sliced 2026-07-02); legibility at L2 (story-map)."
   scale_of_impact: >
     A capability/adoption unlock rather than a time-saver: the difference between
     'AEP is lore only its author can wield' and 'a small team can see and steer the
@@ -101,7 +101,7 @@ product:
       - "Capture at least one decision-memory entry inline via pi.appendEntry."
     out_of_scope:
       - "gh repo create or any remote side-effect."
-      - "Driving a packaged /skill: (first proven at Layer 1 - scaffold)."
+      - "Driving a packaged /skill: (first proven at Layer 1 - envision)."
       - "Story-map rendering, detect-state routing, session-resume."
       - "A second-person 'follows unaided' test (belongs to the story-map layer)."
     deferred:
@@ -159,17 +159,23 @@ product:
       name: "UX-flow alignment"
       user_can: "(human alignment) calibrate the cockpit IA / layout / conversation rhythm."
       outcome_contract: null
+    # RE-SLICED 2026-07-02: reordered to match AEP Path A (new product from scratch =
+    # envision -> map -> validate -> scaffold, per /aep-onboard). Envision now comes BEFORE
+    # scaffold: the L0 originate README IS the /aep-envision context, so envision is the
+    # natural next /aep-* drive; you scaffold the monorepo only AFTER product+architecture
+    # are defined. (A re-slice/release-line move, NOT a re-envision — backbone activities
+    # unchanged, only their order/layer.)
     - layer: 1
-      name: "Scaffold (first /skill: drive - architecture-proof gate)"
-      user_can: "Drive /skill:aep-scaffold through the SDK on the new repo (Better-T-Stack default + AEP infra), observed/gated. This is where 'conduct, don't reimplement' is actually proven."
+      name: "Envision (first /skill: drive from the originate README)"
+      user_can: "Drive /skill:aep-envision through the SDK, turning the L0 originate README into product/index.yaml. This is the first real /aep-* skill drive - where 'conduct, don't reimplement' is proven - and it consumes L0's output directly (the originate README IS the envision context)."
       outcome_contract: null
     - layer: 2
-      name: "Envision"
-      user_can: "Drive /skill:aep-envision -> product/index.yaml."
+      name: "Story-map + routing (legibility test)"
+      user_can: "After envision, drive /skill:aep-map to forge the story graph, and the UI CONVERTS to a user-story-mapping interface showing the AEP journey across lifecycle/layers with live status; detect-state routing resumes at the right step. The 'second person follows unaided' and team-alignment hypotheses are tested here."
       outcome_contract: null
     - layer: 3
-      name: "Story-map + routing (legibility test)"
-      user_can: "After envision + map are forged, the UI CONVERTS to a user-story-mapping interface showing the AEP journey across lifecycle/layers with live status; detect-state routing resumes at the right step. The 'second person follows unaided' and team-alignment hypotheses are tested here."
+      name: "Scaffold (architecture-proof gate)"
+      user_can: "Now that the product is envisioned + mapped, drive /skill:aep-scaffold through the SDK to create the monorepo (Better-T-Stack default + AEP infra), observed/gated. Path A places scaffold AFTER envision+map - you scaffold what you've already defined."
       outcome_contract: null
     - layer: 4
       name: "Story execution"
@@ -194,19 +200,21 @@ product:
       description: "git init a new repo and construct the README via a modal form (imagine pass)"
       order: 1
       layer_introduced: 0
-    - id: scaffold
-      name: "Scaffold"
-      description: "scaffold the monorepo (Better-T-Stack + AEP infra) via /skill:aep-scaffold"
-      order: 2
-      layer_introduced: 1
+    # RE-SLICED 2026-07-02 to AEP Path A order: envision -> map -> scaffold (envision now
+    # precedes scaffold; the originate README feeds envision directly).
     - id: envision
       name: "Envision"
-      description: "frame the product via /skill:aep-envision"
-      order: 3
-      layer_introduced: 2
+      description: "frame the product via /skill:aep-envision (consumes the L0 originate README as context)"
+      order: 2
+      layer_introduced: 1
     - id: map-journey
       name: "Map and view journey"
       description: "decompose into a story map and view/steer the journey in the story-mapping UI"
+      order: 3
+      layer_introduced: 2
+    - id: scaffold
+      name: "Scaffold"
+      description: "scaffold the monorepo (Better-T-Stack + AEP infra) via /skill:aep-scaffold, after envision+map"
       order: 4
       layer_introduced: 3
     - id: execute-story
@@ -307,7 +315,7 @@ product:
       resolution: "Re-stated with a measurable target; the re-work criterion is gated on instrumenting the raw-slash-command baseline on the next mission (open question)."
     - challenge: "The walking skeleton never exercises the /skill: invocation the architecture rests on."
       angle: technical_feasibility
-      resolution: "Layer 1 (scaffold via /skill:aep-scaffold) is designated the real architecture-proof gate; recorded as accepted risk for L0."
+      resolution: "Re-sliced 2026-07-02: Layer 1 is now envision (/skill:aep-envision) - the first real /skill: drive, consuming the L0 originate README; scaffold (now Layer 3) remains an architecture-proof gate. Recorded as accepted risk for L0."
     - challenge: "The engine couples to TUI primitives, deferring the cross-process (web) boundary to a future cliff."
       angle: technical_feasibility
       resolution: "Engine<->renderer seam is a v0 requirement; the engine emits structured events / decision requests and the TUI is one consumer."

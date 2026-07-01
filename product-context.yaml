@@ -15,9 +15,9 @@ calibration:
     - layer: 0.5
       dimensions: ["ux-flow"]
       trigger: "After the L0 modal-form walking skeleton runs end-to-end - calibrate the form IA / layout before extending the UI."
-    - layer: 2
+    - layer: 1
       dimensions: ["scope-direction"]
-      trigger: "While driving envision - confirm product scope / direction as it sharpens."
+      trigger: "While driving envision (re-sliced to L1, 2026-07-02) - confirm product scope / direction as it sharpens."
     - layer: 3
       dimensions: ["object-model"]
       trigger: "Before building the story-mapping UI - auto-draft and human-approve the noun-first Object Map for the story-map objects (Story/Layer/Gate/Journey)."
@@ -930,9 +930,17 @@ cost:
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
   - date: 2026-07-02
+    type: reslice
+    author: human
+    summary: "Re-sliced the layer plan to AEP Path A order (per /aep-onboard: a new product from scratch runs envision -> map -> validate -> scaffold). Rotated L1/L2/L3: was L1 Scaffold / L2 Envision / L3 Story-map -> now L1 ENVISION / L2 Story-map / L3 Scaffold. Rationale: the L0 originate README IS the /aep-envision context, so envision is the natural next /aep-* skill drive; you scaffold the monorepo only AFTER product+architecture are defined. Backbone ACTIVITIES unchanged (only order + layer_introduced) -> this is a re-slice, NOT a re-envision. Updated product/index.yaml layers + activities + the accepted-risk/open-question notes; product-context.yaml calibration plan (scope-direction L2->L1). Next dispatch target: L1 Envision — drive /skill:aep-envision through the SDK from the originate README."
+    sections_changed:
+      - product
+      - calibration
+      - changelog
+  - date: 2026-07-02
     type: layer_gate
     author: human
-    summary: "Layer 0.5 gate -> PASSED (wrap). L0.5 (UX-flow alignment: SIBYL persona + guided-originate skill-ification) is complete — SIBYL-012 done. Tier-1: 100 tests green + tsc clean. Tier-2: journey 01.2 re-dogfooded CLEAN END-TO-END via shell-use from a cwd OUTSIDE the SIBYL repo — agent read the bundled sibyl-originate SKILL.md, asked 3 focusing questions, proactively drafted a focused README, committed on approval (77d6124), decision captured. 3/3 SIBYL-012 criteria proven; evidence in docs/layer-gates/0.5.md. Advance to Layer 1 (Scaffold) pending human go."
+    summary: "Layer 0.5 gate -> PASSED (wrap). L0.5 (UX-flow alignment: SIBYL persona + guided-originate skill-ification) is complete — SIBYL-012 done. Tier-1: 100 tests green + tsc clean. Tier-2: journey 01.2 re-dogfooded CLEAN END-TO-END via shell-use from a cwd OUTSIDE the SIBYL repo — agent read the bundled sibyl-originate SKILL.md, asked 3 focusing questions, proactively drafted a focused README, committed on approval (77d6124), decision captured. 3/3 SIBYL-012 criteria proven; evidence in docs/layer-gates/0.5.md. Advance to the next layer pending human go."
     sections_changed:
       - layer_gates
       - changelog
