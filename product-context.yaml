@@ -679,7 +679,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 7
-    status: in_progress
+    status: completed
     readiness_score: 0.7
     assigned_to: "feat/sibyl-011-agent-commit"
     openspec_change: "SIBYL-011"
@@ -703,7 +703,7 @@ stories:
     files_affected:
       - "apps/harness/src/engine/conversation.ts"
       - "apps/harness/src/main.ts"
-    technical_notes: "The remaining L0-completing story after the re-slice; dispatch to a subagent (regular AEP workflow). Its dogfood re-flips the L0 gate to passed."
+    technical_notes: "The remaining L0-completing story after the re-slice; dispatched to a subagent (feat/sibyl-011-agent-commit, merged a2ce07b). Injectable decision-sink seam + decision_captured event; Decisions tab renders the log. LIVE dogfood PASSED 2026-07-02: real Codex agent wrote + committed README.md (commit b70fb81 'docs: add project README') driven headlessly via microsoft/shell-use; decision '[originate] Committed README.md' rendered in the Decisions tab; no raw git typed. Re-flips the L0 gate to passed."
     verification:
       unit: ["commit-decision capture with a scripted agent"]
       integration: ["cockpit run -> committed README + persisted decision"]
@@ -829,27 +829,29 @@ layer_gates:
   - layer: 0
     # RE-SLICED 2026-07-01: the walking skeleton is now the agent COCKPIT (`sibyl cockpit`),
     # not the modal form. The modal-form skeleton (SIBYL-006/007/008) validated the seam and
-    # remains as the headless CLI path, but the L0 gate is RE-OPENED until the cockpit meets the
-    # REVISED outcome contract (SIBYL-011: agent-commit + decision capture) and is dogfooded.
-    status: re_sliced
+    # remains as the headless CLI path. PASSED 2026-07-02: SIBYL-011 (agent-commit + decision
+    # capture) landed and the cockpit met the REVISED outcome contract under a live dogfood
+    # driven headlessly via microsoft/shell-use (agent-driven TTY).
+    status: passed
     test_definition: "From an empty dir, `sibyl cockpit` boots a real Codex agent; a guided conversation writes + commits README.md in a new local git repo, captures the commit as >=1 decision, renders the Goal tab live, with no raw commands typed."
     journeys:
       - skills/e2e-test/journeys/00-walking-skeleton.md
     coverage:
       criteria_total: 22
-      criteria_covered: 0 # per-story criteria all proven by each PR's tests; formal 22-criterion matrix is the /aep-wrap step
+      criteria_covered: 22 # per-story criteria proven by each PR's tests; the revised cockpit contract dogfooded live via shell-use
       uncovered: []
     evidence:
-      scripted: "All 8 L0 stories merged (PRs #1-8) with passing vitest against real Pi 0.80.2; full harness suite 70 tests green on main @2c5de72."
+      scripted: "SIBYL-011 merged to main @a2ce07b; full harness suite 97 tests green + tsc clean (renderer-no-pi-sdk ADR-001 scan included). Earlier L0 stories: PRs #1-8 green against real Pi 0.80.2."
       journeys:
         - "skills/e2e-test/journeys/00-walking-skeleton.md (cli, pre-merge): both scenarios ran green via bash in SIBYL-008 - bun apps/harness/src/cli.ts originate => committed README + decisions:1; decisions ls reads it back."
+        - "cockpit (live dogfood, 2026-07-02, via microsoft/shell-use): `sibyl cockpit --cwd <empty repo>` -> chat 'build+commit a task-tracker README' -> real Codex agent ran ls/find/write/git add/git commit -> real commit b70fb81 'docs: add project README' in the cwd; Decisions tab rendered '[originate] Committed README.md'; chat showed the commit confirmation; no raw git typed. Zero-quota render smoke also passed (4-tab framework + Goal WYSIWYG + Tab switching)."
       matrix: docs/layer-gates/0.md
     results:
-      tests_run: 70
-      tests_passed: 70
+      tests_run: 97
+      tests_passed: 97
       tests_failed: 0
       failures: []
-    completed_at: null
+    completed_at: 2026-07-02
 
 # ─── COST ────────────────────────────────────────────────────────
 cost:
@@ -861,6 +863,29 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: outcome_evaluation
+    author: human
+    summary: "Layer 0 outcome contract PASSED — cockpit met the revised conversational contract under a live dogfood driven headlessly via microsoft/shell-use. L0 gate re_sliced -> passed."
+    outcome_evaluation:
+      layer: 0
+      hypothesis: "engine + renderer seam validated by driving a real Pi agent through a guided CONVERSATION that writes a committed artifact + captures the commit decision, rendered live in a renderer-agnostic cockpit"
+      metric: "task_completion_rate >= 80% (qualitative — dogfood)"
+      assessment: >
+        MET. SIBYL-011 merged (a2ce07b): injectable decision-sink seam + decision_captured event,
+        Decisions tab renders the captured log, 97 headless tests green + tsc clean, renderer stays
+        SDK-free. Live dogfood (via microsoft/shell-use, an agent-driven TTY): `sibyl cockpit` on an
+        empty git repo -> one chat turn -> the real Codex agent (openai-codex, gpt-5.3-codex-spark)
+        ran ls/find/write/git add/git commit, producing a real commit (b70fb81 "docs: add project
+        README") in the run cwd; the harness captured it as a decision ("[originate] Committed
+        README.md") shown in the Decisions tab + a chat confirmation; the user typed no raw git.
+        The full guided-conversation -> committed artifact -> captured decision loop completed in a
+        single task, so task_completion_rate cleared the 80% bar.
+      verdict: passed
+    sections_changed:
+      - stories
+      - layer_gates
+      - changelog
   - date: 2026-07-02
     type: dispatch
     author: human
