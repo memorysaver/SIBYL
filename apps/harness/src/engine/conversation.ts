@@ -93,19 +93,27 @@ export interface Conversation {
  */
 export const COCKPIT_TOOLS = ["read", "grep", "find", "ls", "write", "edit", "git"] as const;
 
-/** The guided-flow brief appended to the system prompt (the co-pilot's role). */
-export const COCKPIT_GUIDE = [
-  "You are SIBYL's originate co-pilot, driving a project cockpit whose primary view is the project's README (its Goal).",
-  "Your job is to help the user FOCUS a half-formed idea into a clear answer to 'what project to build' — the README IS that focused product definition (it becomes the context a later envision step builds on), so aim it at the product/problem/vision, not implementation detail.",
-  "Open by asking focused questions, ONE at a time, to draw out the PRODUCT they want to build, the PROBLEM it solves, and the VISION — a natural dialogue, never a rigid form.",
-  "Don't interrogate endlessly: once a couple of exchanges give you a rough sense of product + problem + vision, DON'T wait to be asked — PROACTIVELY offer to draft the README, then write a first `README.md` and show it in the Goal tab.",
-  "Draft it in the working directory with your tools: a clear title, a one-line pitch, a `## Problem` section, and a `## Vision` section. Then keep refining it WITH the user, asking follow-ups as needed.",
-  "When the README reflects the user's intent, offer to commit it with git.",
-  "When the user asks you to commit (or approves committing), persist `README.md` YOURSELF with the `git` tool —",
-  "never ask the user to run a raw git command. First `git init` if the working directory is not yet a repo,",
-  "then `git add README.md`, then `git commit -m \"docs: add project README\"` (or a message reflecting the change).",
-  "Always pass the working directory as the tool's `cwd`.",
-].join(" ");
+/**
+ * The THIN cockpit brief appended to the system prompt. The SUBSTANCE of the
+ * guided-originate flow — the focus-first interview, proactive drafting, the
+ * `## Problem`/`## Vision` README, commit-on-approval — now lives in the BUNDLED
+ * `sibyl-originate` Pi skill (`apps/harness/skills/sibyl-originate/SKILL.md`,
+ * discovered via `additionalSkillPaths`), NOT hardcoded in the binary.
+ *
+ * This pointer exists only to ACTIVATE that skill from turn 1. Pi skills are
+ * normally invoke-on-demand (the model reads a skill's `SKILL.md` when a task
+ * matches its description), but the cockpit needs the conductor live immediately.
+ * So we name the skill and instruct the agent to read + follow it before its first
+ * reply — the skill's `<location>` is surfaced into the prompt by the SDK's
+ * `formatSkillsForPrompt`, so the agent knows exactly which file to `read`.
+ * {@link SIBYL_PERSONA} is still prepended ahead of this (identity first).
+ */
+export const COCKPIT_ORIGINATE_POINTER =
+  "You are in SIBYL's ORIGINATE COCKPIT, whose primary view is the project's README (its Goal). " +
+  "Before your first reply, use the `read` tool to load the `sibyl-originate` skill " +
+  "(its SKILL.md `<location>` is listed in your available skills) and CONDUCT that guided originate " +
+  "flow from turn 1 — interview to focus, proactively draft the README, refine it with the user, and " +
+  "commit it yourself with git on approval.";
 
 /** The run phase decisions captured in the cockpit are recorded under (mirrors main.ts). */
 const COCKPIT_PHASE = "originate";
@@ -188,10 +196,12 @@ export type DecisionSink = (entry: DecisionEntry) => void;
 
 /**
  * Boot a real Codex-backed cockpit session: the SIBYL engine-extension + the
- * narrow git tool bound, the guided cockpit brief appended to the system prompt.
- * Auth + model come from the user's `~/.pi/agent` config. `onPi`, when supplied,
- * receives the session's real `ExtensionAPI` so the default decision sink can
- * persist commits via `appendDecision` (the same pi-capture trick `main.ts` uses).
+ * narrow git tool bound, the THIN originate pointer appended to the system prompt.
+ * The guided-flow SUBSTANCE ships as the bundled `sibyl-originate` skill (found via
+ * `additionalSkillPaths` inside {@link bootSession}); the pointer just activates it
+ * from turn 1. Auth + model come from the user's `~/.pi/agent` config. `onPi`, when
+ * supplied, receives the session's real `ExtensionAPI` so the default decision sink
+ * can persist commits via `appendDecision` (the same pi-capture trick `main.ts` uses).
  */
 async function bootCockpitSession(
   cwd: string,
@@ -208,17 +218,17 @@ async function bootCockpitSession(
   }
   const { session } = await bootSession(cwd, {
     extensionFactories,
-    appendSystemPrompt: [COCKPIT_GUIDE],
+    appendSystemPrompt: [COCKPIT_ORIGINATE_POINTER],
   });
   return session;
 }
 
 /**
  * The production connector: boots a real Pi `AgentSession` via {@link bootSession}
- * with the git tool bound and the guided cockpit brief appended to the system
- * prompt. Auth + model come from the user's `~/.pi/agent` config (the
- * `openai-codex` login + `defaultModel`). Requires no login step when already
- * authenticated.
+ * with the git tool bound and the thin originate pointer appended to the system
+ * prompt (the flow itself is the bundled `sibyl-originate` skill). Auth + model
+ * come from the user's `~/.pi/agent` config (the `openai-codex` login +
+ * `defaultModel`). Requires no login step when already authenticated.
  */
 export const defaultConversationConnect: ConversationConnect = (cwd) => bootCockpitSession(cwd);
 

@@ -8,6 +8,10 @@
   },
   "type": "module",
   "main": "src/engine/session.ts",
+  "files": [
+    "src",
+    "skills"
+  ],
   "scripts": {
     "build": "tsc --noEmit",
     "check-types": "tsc --noEmit",
