@@ -53,6 +53,12 @@ available with a usable identity (the harness sets a default `GIT_*` identity if
 - **Verify (bash):**
   - exit code `0`;
   - `DIR/README.md` exists and is non-empty;
+  - **README is structured** (not just non-empty): the committed `DIR/README.md` has a level-1 title line
+    (`grep -qE '^# .+'`) — here `# SIBYL` from the seeded product — **and** a `## Problem` section
+    (`grep -qE '^## Problem'`) **and** a `## Vision` section (`grep -qE '^## Vision'`), each with a
+    non-empty body line beneath it (the composed draft / deterministic seed carries the seeded problem &
+    vision text — assert the file contains `no guided originate flow` and `a TUI harness that conducts a Pi
+    agent`), and the whole file is non-trivial (`wc -c < "$DIR/README.md"` ≥ 120);
   - `DIR/.git` exists and `git -C "$DIR" log --oneline` shows ≥1 commit, and
     `git -C "$DIR" show --stat HEAD` lists `README.md`;
   - the decision log records ≥1 `sibyl-decision` entry — the `originate` stdout prints `decisions: 1`, and

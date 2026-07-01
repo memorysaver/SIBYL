@@ -2,9 +2,12 @@
 
 The journeys in [`journeys/`](./journeys/) are **tool-agnostic** — they say *what* to verify, not *how*.
 This file is the *how*: it resolves which automation tool drives a given journey, by **target type**
-(web / mobile / desktop / cli), the **host** running the agent, and any **pinned preference** — with
+(web / mobile / desktop / cli / tui), the **host** running the agent, and any **pinned preference** — with
 health probes and graceful degrade. (`cli` drives the built command-line binary via **bash** — an agent
-invoking the CLI is the same as a human typing it, so the journey is a faithful dogfood.)
+invoking the CLI is the same as a human typing it, so the journey is a faithful dogfood. `tui` drives an
+**interactive full-screen terminal UI** — e.g. `sibyl cockpit` — over a **pseudo-terminal** with
+**shell-use**, because a raw-TTY app can't be driven by plain bash pipes; the agent sends keys, waits for
+renders, and asserts on visible cells + filesystem/git effects, exactly as a human at the terminal would.)
 
 > **Kept in sync with `e2e_tool()` in AEP `patterns/executor/references/dogfood-validation.md`.** That
 > upstream selector is the canonical matrix (used by `/aep-build` and `/aep-autopilot`); this file is its
@@ -13,7 +16,7 @@ invoking the CLI is the same as a human typing it, so the journey is a faithful 
 ## Resolution
 
 ```
-e2e_tool(target_type):              # target_type ∈ {web, mobile, desktop, cli}; from the journey's `target:` front-matter
+e2e_tool(target_type):              # target_type ∈ {web, mobile, desktop, cli, tui}; from the journey's `target:` front-matter
   detect HOST (claude | codex | generic) and whether computer-use / desktop is available
   pref = topology.routing.e2e.tool.<target_type>   # product-context.yaml; optional pin
   if pref: return pref if healthy(pref) else degrade
@@ -32,7 +35,20 @@ e2e_tool(target_type):              # target_type ∈ {web, mobile, desktop, cli
 
   cli:
     bash (run the built binary; assert exit code/stdout/fs)  → degrade (Tier-1 only, mark SKIP)
+
+  tui:                                                       # interactive full-screen terminal UI over a PTY
+    shell-use (run the binary in a PTY; send keys, wait for renders, assert visible cells + git/fs effects)
+              → degrade (drive the binary's headless/scripted entry via bash for the machinery; mark the
+                interactive-conversation criteria SKIP) → Tier-1 only, mark SKIP
 ```
+
+> **`tui` journeys usually spend a live model.** The cockpit's conversation is driven by a real provider
+> (SIBYL: `openai-codex` via the user's ChatGPT-subscription OAuth), so a `tui` journey is a **live-model
+> dogfood** — non-deterministic and **cost-aware** (keep to a few turns, no loops). Two sub-checks avoid
+> burning quota needlessly: the **render/framework** half (does the TUI boot, lay out, switch panes?) is a
+> **zero-quota** shell-use smoke — the session connects lazily on first input — while the **conversation**
+> half (does the agent conduct/guide, write, commit?) is the part that spends budget. If the provider isn't
+> authed/reachable, mark the conversation criteria **SKIP** (not FAIL) and still run the zero-quota half.
 
 ## Tools
 
@@ -44,6 +60,7 @@ e2e_tool(target_type):              # target_type ∈ {web, mobile, desktop, cli
 | **codex-native** | web/desktop | in-app browser + computer-use (multimodal) | host = Codex desktop + computer-use | Codex built-in |
 | **agent-device** | mobile  | iOS / Android native app automation      | `agent-device doctor` (or device list) | [callstack/agent-device](https://github.com/callstack/agent-device) |
 | **bash**         | cli     | run the built CLI binary; assert exit code / stdout / stderr / filesystem | `command -v bash`   | shell built-in |
+| **shell-use**    | tui     | drive an interactive terminal TUI over a PTY (send keys/`submit`/`press`, `wait`, `expect text`, `text`/`screenshot` the rendered cells) | `shell-use --version` | [microsoft/shell-use](https://github.com/microsoft/shell-use) |
 
 ## Health probes
 
@@ -55,7 +72,9 @@ playwright_available()  { command -v npx >/dev/null 2>&1 && npx --no-install pla
 webwright_available()   { command -v webwright >/dev/null 2>&1 && webwright --version >/dev/null 2>&1; }
 agent_device_healthy()  { command -v agent-device >/dev/null 2>&1 && agent-device doctor >/tmp/ad-smoke.log 2>&1; }
 bash_available()        { command -v bash >/dev/null 2>&1; }   # ~always true; gates the cli track
+shell_use_healthy()     { command -v shell-use >/dev/null 2>&1 && shell-use --version >/dev/null 2>&1; }   # gates the tui track
 # codex-native: not a CLI probe — available only when HOST is Codex desktop with computer-use enabled.
+# install shell-use (macOS/Linux): brew tap microsoft/shell-use https://github.com/microsoft/shell-use && brew trust microsoft/shell-use && brew install shell-use
 ```
 
 ## Target environment (from `policy.md`)
@@ -79,8 +98,14 @@ The journey's `target:` front-matter is authoritative. When absent, infer from t
 | ------------------------------------- | ----------- |
 | `native-uniwind` / React Native / Expo | `mobile`   |
 | `tauri` / `electrobun` / Electron     | `desktop`   |
+| an **interactive full-screen TUI** — a raw-mode / `isTTY`-guarded terminal surface (e.g. `sibyl cockpit`) | `tui` |
 | no web frontend — CLI entrypoint (`bin`, Go `cmd/`, `console_scripts`) OR a library/package (exports only) | `cli` |
 | a web frontend                        | `web`       |
+
+> A binary can expose **both** a `cli` surface (headless subcommands, bash-drivable, deterministic) and a
+> `tui` surface (an interactive full-screen mode over a PTY). SIBYL is exactly this: the headless
+> `sibyl originate … --yes` path is `cli`; `sibyl cockpit` is `tui`. Pick `target:` **per journey** by which
+> surface the scenario drives — they gate the same layer with different tools.
 
 ## Config pin
 
@@ -95,6 +120,7 @@ topology:
         mobile: auto    # auto | agent-device
         desktop: auto   # auto | codex-native | agent-browser
         cli: auto       # auto | bash
+        tui: auto       # auto | shell-use
 ```
 
 `auto` (default) defers to `e2e_tool()`; an explicit value pins it (still subject to the health probe —
@@ -109,6 +135,11 @@ When no tool in the track is healthy, **degrade — don't FAIL**:
 - **mobile:** fall back to API/contract checks; mark UI steps `SKIP` with the reason.
 - **cli:** bash is ~always present, so degrade only when the **binary won't build/run** — mark `SKIP`
   with the reason and fall back to Tier-1 scripted cases for those criteria.
+- **tui:** if `shell-use` is absent/unhealthy, drive the binary's **headless/scripted** entry via bash for
+  the machinery (SIBYL: the `cli` originate path proves the write→commit→decision loop deterministically)
+  and mark the **interactive-conversation** criteria `SKIP`. If `shell-use` is healthy but the **model
+  provider isn't authed/reachable**, still run the **zero-quota render/framework** half and mark the
+  **conversation** criteria `SKIP` (not FAIL) with the reason.
 
 A `SKIP` with a recorded reason is honest coverage; a silent pass is not.
 

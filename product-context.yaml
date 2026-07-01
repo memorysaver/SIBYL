@@ -835,7 +835,8 @@ layer_gates:
     status: passed
     test_definition: "From an empty dir, `sibyl cockpit` boots a real Codex agent; a guided conversation writes + commits README.md in a new local git repo, captures the commit as >=1 decision, renders the Goal tab live, with no raw commands typed."
     journeys:
-      - skills/e2e-test/journeys/00-walking-skeleton.md
+      - skills/e2e-test/journeys/00-walking-skeleton.md # cli (bash, scripted model): the headless originate machinery
+      - skills/e2e-test/journeys/01-cockpit-guided-originate.md # tui (shell-use, live model): guided Q&A -> focused committed README + captured decision
     coverage:
       criteria_total: 22
       criteria_covered: 22 # per-story criteria proven by each PR's tests; the revised cockpit contract dogfooded live via shell-use

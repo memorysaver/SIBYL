@@ -11,7 +11,8 @@ How to run a journey is in the **execution protocol** of [`../SKILL.md`](../SKIL
 
 | #  | Journey                                      | Covers (layer / criteria)   |
 | -- | -------------------------------------------- | --------------------------- |
-| 00 | [Walking skeleton](00-walking-skeleton.md)   | Layer 0 — MVP contract path |
+| 00 | [Walking skeleton](00-walking-skeleton.md)   | Layer 0 — MVP contract path (headless `cli` originate, scripted model) |
+| 01 | [Cockpit: guided originate](01-cockpit-guided-originate.md) | Layer 0 — the cockpit (`tui`, live model): guided Q&A → focused committed README + captured decision (SIBYL-009/010/011) |
 | .. | _add a row per journey as the product grows_ | _layer N / criterion ids_   |
 
 ## Journey doc template
@@ -21,7 +22,7 @@ binding (the executor is an LLM agent, not Cucumber).
 
 ```markdown
 ---
-target: web        # web | mobile | desktop | cli — picks the tool track in ../tool-selection.md (cli → bash: run the built binary)
+target: web        # web | mobile | desktop | cli | tui — picks the tool track in ../tool-selection.md (cli → bash: run the built binary; tui → shell-use: drive an interactive full-screen TUI over a PTY, usually a live-model dogfood)
 layer: 0           # which layer gate this journey proves
 covers: []         # acceptance-criterion / capability ids this journey proves (feeds the gate coverage matrix)
 ---

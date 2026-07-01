@@ -15,11 +15,22 @@ and Pi all read this same file — that is what keeps behavior consistent across
 | **Journey timing**   | pre-merge                 |
 
 > **Why `cli`.** SIBYL's product is the **Pi-based TUI harness** (`apps/harness`), a command-line program —
-> not the scaffolded Better-T-Stack web app. The Tier-2 journey dogfoods the **built harness binary via
-> bash** (drive it as a user would; assert exit code / stdout / filesystem), with **no dev server and no
-> deployed URL**, and runs **pre-merge** in `/aep-build` Phase 6. The Cloudflare web surface is a later
-> layer (L7 web observer); when it ships, add a `deployed:<url>` web journey then — it does not gate the
-> TUI layers.
+> not the scaffolded Better-T-Stack web app. The Tier-2 journey dogfoods the **built harness binary**, with
+> **no dev server and no deployed URL**, and runs **pre-merge** in `/aep-build` Phase 6. The Cloudflare web
+> surface is a later layer (L7 web observer); when it ships, add a `deployed:<url>` web journey then — it
+> does not gate the TUI layers.
+>
+> **Two local surfaces, one binary.** `dogfood_target: cli` here means "the built local binary, no URL" —
+> and that binary has **two** driveable surfaces, so a journey's `target:` front-matter picks the tool:
+> - **`cli`** (headless subcommands: `sibyl originate … --yes`, `sibyl decisions ls`) → driven by **bash**,
+>   deterministic (scripted model) — journey [`00`](journeys/00-walking-skeleton.md).
+> - **`tui`** (the interactive **`sibyl cockpit`**) → driven by **shell-use** over a PTY, against a **LIVE**
+>   model (`openai-codex`) — journey [`01`](journeys/01-cockpit-guided-originate.md). This is a **live-model,
+>   cost-aware** dogfood; its zero-quota render half runs always, its conversation half spends budget and is
+>   `SKIP`-able when the provider isn't reachable (see [`tool-selection.md`](./tool-selection.md)).
+>
+> Both are local, pre-merge, no URL — so `dogfood_target` stays `cli`; the split is only in *how* each
+> surface is driven.
 
 - **Applicable tiers** — only these tiers gate a layer (its `passed` needs them green + every acceptance
   criterion proven). A **CLI** is `1 + 2` (Tier-2 journey is **bash-driven** — run the built binary, assert
