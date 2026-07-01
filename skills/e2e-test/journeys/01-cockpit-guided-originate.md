@@ -18,6 +18,14 @@ capture surfaced in the Decisions tab (SIBYL-011). Complements the deterministic
 [`00-walking-skeleton.md`](00-walking-skeleton.md) (which proves the same write→commit→decision *machinery*
 with a scripted model). Key surface: `sibyl cockpit`; tools the agent uses: `write`, `git`.
 
+> **Why this is the walking skeleton's first step.** The focused `README.md` this journey produces is not a
+> throwaway — it is the **"what to build" context document that `/aep-envision` consumes** to author
+> `product/index.yaml`. So the cockpit's guided-originate loop is literally **AEP step 0**: it turns a
+> founder's half-formed idea into the focused product definition the rest of the pipeline
+> (`/aep-envision` → `/aep-map` → …) builds on. The behavior under test is therefore that the agent
+> **proactively interviews to focus the project** (not that it can write a file) — a vague opener must be
+> met with clarifying questions before any artifact solidifies.
+
 **Target:** `tui` — the **interactive cockpit** (`sibyl cockpit`, `apps/harness/src/cli.ts`), driven over a
 **pseudo-terminal** by **shell-use** (resolved by [`../tool-selection.md`](../tool-selection.md)). The
 conversation runs against a **LIVE** model — SIBYL's `openai-codex` provider (the user's ChatGPT-subscription

@@ -846,6 +846,7 @@ layer_gates:
       journeys:
         - "skills/e2e-test/journeys/00-walking-skeleton.md (cli, pre-merge): both scenarios ran green via bash in SIBYL-008 - bun apps/harness/src/cli.ts originate => committed README + decisions:1; decisions ls reads it back."
         - "cockpit (live dogfood, 2026-07-02, via microsoft/shell-use): `sibyl cockpit --cwd <empty repo>` -> chat 'build+commit a task-tracker README' -> real Codex agent ran ls/find/write/git add/git commit -> real commit b70fb81 'docs: add project README' in the cwd; Decisions tab rendered '[originate] Committed README.md'; chat showed the commit confirmation; no raw git typed. Zero-quota render smoke also passed (4-tab framework + Goal WYSIWYG + Tab switching)."
+        - "cockpit GUIDED journey 01.2 (live, 2026-07-02, via shell-use): from a deliberately VAGUE opener ('some developer project, not sure what — help me figure it out'), the agent PROACTIVELY asked 2 focusing questions ('biggest annoyance?' then 'what inputs?') and wrote/committed NOTHING until the idea was focused; it then wrote a focused README ('# DevFlow Prioritizer', ## Problem/## Vision, 824B) reflecting the interview (solo dev, next-best-action, git/TODO/PRs) and committed it (27f8afc); Decisions tab captured it. Proves the guiding/interview behavior (the README is the /aep-envision context) — not just the write->commit machinery."
       matrix: docs/layer-gates/0.md
     results:
       tests_run: 97
