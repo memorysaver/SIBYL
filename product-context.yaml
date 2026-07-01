@@ -895,6 +895,30 @@ layer_gates:
       failures: []
     completed_at: 2026-07-02
 
+  - layer: 0.5
+    # UX-flow alignment (calibration): SIBYL persona (foundational system prompt) + guided-originate
+    # skill-ified into a CLI-bundled Pi skill (SIBYL-012). PASSED 2026-07-02 under a clean live dogfood.
+    status: passed
+    test_definition: "The cockpit self-identifies as SIBYL and frames tasks as software engineering; the guided-originate conductor behavior is sourced from a CLI-BUNDLED skill (found even when run OUTSIDE the SIBYL repo), not a hardcoded brief; a vague opener is FOCUSED through the agent's questions into a committed README + captured decision, behavior unchanged."
+    journeys:
+      - skills/e2e-test/journeys/01-cockpit-guided-originate.md # tui (shell-use, live model)
+    coverage:
+      criteria_total: 3 # SIBYL-012's acceptance criteria (persona / bundled-skill / generalizable pattern)
+      criteria_covered: 3
+      uncovered: []
+    evidence:
+      scripted: "SIBYL-012 merged @1af90fe; full harness suite 100 tests green (+3: bundled-skill discovery from OUTSIDE the git root, prompt-surfacing via formatSkillsForPrompt, persona-first) + tsc clean."
+      journeys:
+        - "persona (live, 2026-07-02, shell-use): asked 'who are you?', agent self-identifies as SIBYL + 'software' engineering."
+        - "cockpit GUIDED journey 01.2 CLEAN END-TO-END (live, 2026-07-02, shell-use, run from a cwd OUTSIDE the SIBYL repo): agent `read .../skills/sibyl-originate/SKILL.md` (bundled-skill discovery via additionalSkillPaths — cwd-independent) -> asked 3 focusing questions (pain point -> tool details -> CI stack), wrote/committed NOTHING until focused -> PROACTIVELY drafted a focused README (## Problem/## Vision, 951B, reflecting flaky-CI/trust-score/quarantine) -> committed on approval (77d6124 'docs: add focused project README') -> Decisions tab rendered '[originate] Committed README.md'. Guided behavior unchanged, now sourced from the bundled skill."
+      matrix: docs/layer-gates/0.5.md
+    results:
+      tests_run: 100
+      tests_passed: 100
+      tests_failed: 0
+      failures: []
+    completed_at: 2026-07-02
+
 # ─── COST ────────────────────────────────────────────────────────
 cost:
   total_usd: 0
@@ -905,6 +929,13 @@ cost:
 
 # ─── CHANGELOG ───────────────────────────────────────────────────
 changelog:
+  - date: 2026-07-02
+    type: layer_gate
+    author: human
+    summary: "Layer 0.5 gate -> PASSED (wrap). L0.5 (UX-flow alignment: SIBYL persona + guided-originate skill-ification) is complete — SIBYL-012 done. Tier-1: 100 tests green + tsc clean. Tier-2: journey 01.2 re-dogfooded CLEAN END-TO-END via shell-use from a cwd OUTSIDE the SIBYL repo — agent read the bundled sibyl-originate SKILL.md, asked 3 focusing questions, proactively drafted a focused README, committed on approval (77d6124), decision captured. 3/3 SIBYL-012 criteria proven; evidence in docs/layer-gates/0.5.md. Advance to Layer 1 (Scaffold) pending human go."
+    sections_changed:
+      - layer_gates
+      - changelog
   - date: 2026-07-02
     type: story_completed
     author: human
