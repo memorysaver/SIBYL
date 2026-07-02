@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 12
+dispatch_epoch: 13
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -907,7 +907,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 3
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "feat/sibyl-017-brief-injection"
     openspec_change: "SIBYL-017"
@@ -947,10 +947,10 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 4
-    status: pending
+    status: in_progress
     readiness_score: 0.85
-    assigned_to: null
-    openspec_change: null
+    assigned_to: "feat/sibyl-016-cockpit-envision"
+    openspec_change: "SIBYL-016"
     priority: high
     business_value: 8
     complexity: M
@@ -1544,4 +1544,16 @@ changelog:
     type: dispatch
     author: agent
     summary: "Dispatch epoch 12 (L1 wave 3): SIBYL-017 (deterministic brief injection per the ratified Phase Pattern) -> feat/sibyl-017-brief-injection; was held back until SIBYL-014 merged (flow.ts overlap)."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: story_completed
+    author: agent
+    summary: "SIBYL-017 (deterministic brief injection) merged @4aa668e: loadPhaseBrief (trusted-roots only, throws on missing/empty; reuses the SDK's exported stripFrontmatter) + injection ordering persona -> promptBrief role line -> compiled brief body -> caller fragments; originate cockpit migrated (COCKPIT_ORIGINATE_POINTER reduced to a one-line role line, no read-the-skill instruction); dependency inverted - COCKPIT_TOOLS/pointer now live in flow.ts, conversation.ts re-exports byte-compatibly. 164 tests green (+7), tsc clean. Phase Pattern invariant #2 is now mechanical."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: dispatch
+    author: agent
+    summary: "Dispatch epoch 13 (L1 wave 4, final): SIBYL-016 (cockpit envision integration + journey 02) -> feat/sibyl-016-cockpit-envision."
     sections_changed: ["stories"]
