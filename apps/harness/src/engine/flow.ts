@@ -26,6 +26,7 @@ import { join, relative, resolve, sep } from "node:path";
 import type {
   ExtensionFactory,
   ToolCallEventResult,
+  ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
 import { COCKPIT_ORIGINATE_POINTER, COCKPIT_TOOLS } from "./conversation";
@@ -37,6 +38,12 @@ import {
   type BootedSession,
   type DiscoveredSkills,
 } from "./session";
+import {
+  SUBMIT_ENVISION_TOOL_NAME,
+  createEnvisionSubmitTool,
+  type PhaseCompletionHooks,
+} from "./submit";
+import { appendDecision } from "../memory/decisions";
 import { registerGitTool } from "../tools/git";
 
 // ---------------------------------------------------------------------------
@@ -78,11 +85,24 @@ export interface PhaseSpec<Id extends string = PhaseId> {
   /** Appended to the system prompt AFTER {@link SIBYL_PERSONA}. */
   promptBrief: string;
   /**
-   * The phase's typed submit tool (arrives in SIBYL-014; the registry only
-   * names it). The guard exempts it: the submit tool owns the artifact write.
+   * The phase's typed submit tool (SIBYL-014; the registry names it). The
+   * guard exempts it: the submit tool owns the artifact write.
    * `null` for phases that write their artifact directly (e.g. originate).
    */
   completionToolName: string | null;
+  /**
+   * Factory building the phase's typed completion tool (SIBYL-014): a Pi
+   * custom tool whose TypeBox schema IS the phase's output contract and whose
+   * `execute` owns the artifact write + commit. {@link bootPhaseSession}
+   * registers it automatically, defaulting the decision sink to the session's
+   * own `appendDecision`. Omit for phases that write their artifact directly
+   * (originate) or whose submit tool is a later story.
+   *
+   * Typed with the SDK's own "any tool" shape (its `AnyToolDefinition` is not
+   * exported): concrete `ToolDefinition<Schema, Details>` instances are not
+   * assignable to the default `ToolDefinition` under strict variance.
+   */
+  completionToolFactory?: (hooks: PhaseCompletionHooks) => ToolDefinition<any, any, any>;
 }
 
 /**
@@ -122,10 +142,11 @@ export const PHASE_REGISTRY: ReadonlyArray<PhaseSpec> = [
     id: "envision",
     entryCondition: (probe) => probe.hasCommittedReadme() && !probe.hasProductIndex(),
     skillName: "sibyl-envision",
-    toolAllowlist: ["read", "grep", "find", "ls", "submit_envision"],
+    toolAllowlist: ["read", "grep", "find", "ls", SUBMIT_ENVISION_TOOL_NAME],
     pathAllowlist: [],
     promptBrief: ENVISION_BRIEF,
-    completionToolName: "submit_envision",
+    completionToolName: SUBMIT_ENVISION_TOOL_NAME,
+    completionToolFactory: (hooks) => createEnvisionSubmitTool(hooks),
   },
 ];
 
@@ -201,6 +222,13 @@ export function createFsArtifactProbe(cwd: string): ArtifactProbe {
 export interface BootPhaseSessionOptions extends BootSessionOptions {
   /** The project directory the phase session works in. */
   cwd: string;
+  /**
+   * Injectable seams (clock / git runner / completion hooks) threaded into the
+   * phase's completion tool when its registry entry declares a
+   * `completionToolFactory`. A caller-supplied `decisionSink` overrides the
+   * default (persist via the session's own `appendDecision`).
+   */
+  completion?: PhaseCompletionHooks;
 }
 
 /**
@@ -225,7 +253,7 @@ export async function bootPhaseSession(
   spec: PhaseSpec<string>,
   options: BootPhaseSessionOptions,
 ): Promise<BootedSession> {
-  const { cwd, ...rest } = options;
+  const { cwd, completion, ...rest } = options;
   const trustedSkillRoots = [SIBYL_BUNDLED_SKILLS_DIR, ...(rest.additionalSkillPaths ?? [])];
   const booted = await bootSession(cwd, {
     ...rest,
@@ -236,6 +264,8 @@ export async function bootPhaseSession(
         createSibylEngineExtension(),
         (pi) => registerGitTool(pi),
       ]),
+      // …plus the phase's typed completion tool (SIBYL-014), when declared…
+      ...completionToolExtension(spec, completion),
       // …but the invariant guard is ALWAYS bound, caller factories or not.
       createPhaseGuardExtension(spec),
     ],
@@ -245,10 +275,37 @@ export async function bootPhaseSession(
   });
   // `tools` above already restricts creation; re-asserting by name also forces
   // a system-prompt rebuild reflecting the final narrowed tool set. Names the
-  // registry declares ahead of their tool (e.g. `submit_envision` before
-  // SIBYL-014 lands) are ignored by the SDK until that tool is registered.
+  // registry declares ahead of their tool (e.g. a future phase's submit tool
+  // before its story lands) are ignored by the SDK until that tool is registered.
   booted.session.setActiveToolsByName([...spec.toolAllowlist]);
   return booted;
+}
+
+/**
+ * The extension factory registering a phase's typed completion tool (SIBYL-014),
+ * as zero-or-one factories so {@link bootPhaseSession} can spread it. The
+ * decision sink DEFAULTS to persisting through the session's own `ExtensionAPI`
+ * (`appendDecision` — the SIBYL-011 injectable-sink pattern); caller-supplied
+ * hooks override it (tests inject spies).
+ */
+function completionToolExtension(
+  spec: PhaseSpec<string>,
+  hooks: PhaseCompletionHooks | undefined,
+): ExtensionFactory[] {
+  const factory = spec.completionToolFactory;
+  if (!factory) {
+    return [];
+  }
+  return [
+    (pi) => {
+      pi.registerTool(
+        factory({
+          decisionSink: (entry) => appendDecision(pi, entry),
+          ...hooks,
+        }),
+      );
+    },
+  ];
 }
 
 /**
