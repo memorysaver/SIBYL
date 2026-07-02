@@ -1,12 +1,20 @@
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 
 import {
+  COCKPIT_ORIGINATE_POINTER,
   COCKPIT_TOOLS,
   type ConversationEvent,
   type ConversationSession,
   createConversation,
+  defaultConversationConnect,
 } from "../src/engine/conversation";
+import { loadPhaseBrief } from "../src/engine/flow";
 import type { DecisionEntry } from "../src/memory/decisions";
 
 /**
@@ -287,5 +295,54 @@ describe("conversation seam — AgentSessionEvent → ConversationEvent", () => 
     expect(events.some((e) => e.type === "error" && e.detail.includes("no model"))).toBe(true);
     expect(events.at(-1)).toEqual({ type: "status", state: "idle" });
     await conversation.dispose();
+  });
+});
+
+/**
+ * SIBYL-017 — the originate cockpit carries the guided-originate flow as a
+ * COMPILED BRIEF: the full `sibyl-originate` SKILL.md body is injected into the
+ * session's system prompt by the harness. The model never has to notice or
+ * read the skill file, so the old "thin pointer" (an instruction to go `read`
+ * the SKILL.md — a two-step nondeterministic discovery bet) is reduced to a
+ * one-line role line. Proven HEADLESSLY: booting the real default connect
+ * assembles the prompt without ever calling a model.
+ */
+describe("originate cockpit brief injection (SIBYL-017)", () => {
+  it("reduces the pointer to a one-line role line — no runtime skill-reading instruction", () => {
+    expect(COCKPIT_ORIGINATE_POINTER).not.toContain("\n"); // one line
+    expect(COCKPIT_ORIGINATE_POINTER).toContain("sibyl-originate"); // still orients
+    // The discovery bet is gone: it no longer tells the model to read SKILL.md.
+    expect(COCKPIT_ORIGINATE_POINTER).not.toMatch(/`read`|SKILL\.md|<location>/);
+  });
+
+  it("the default cockpit connect injects the sibyl-originate BODY into the system prompt", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sibyl-conv-cockpit-"));
+    try {
+      execFileSync("git", ["init", "-q"], { cwd: dir });
+      const session = await defaultConversationConnect(dir, new AbortController().signal);
+      try {
+        // The real cockpit session is a Pi AgentSession; read its assembled prompt.
+        const prompt = (session as AgentSession).systemPrompt;
+
+        // Role line first-ish (persona precedes it), then the FULL brief body —
+        // asserted via distinctive body lines, not just the skill-name listing.
+        expect(prompt).toContain(COCKPIT_ORIGINATE_POINTER);
+        expect(prompt).toContain(loadPhaseBrief("sibyl-originate"));
+        expect(prompt).toContain("you run git, never the user");
+        expect(prompt).toContain("## Conduct the flow");
+
+        // Frontmatter is stripped: no YAML keys leak into the prompt.
+        expect(prompt).not.toContain("name: sibyl-originate");
+
+        // Ordering: role line before the injected body.
+        expect(prompt.indexOf(COCKPIT_ORIGINATE_POINTER)).toBeLessThan(
+          prompt.indexOf("you run git, never the user"),
+        );
+      } finally {
+        await session.dispose();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

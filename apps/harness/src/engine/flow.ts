@@ -11,6 +11,9 @@
  *  - {@link bootPhaseSession} — a FRESH `AgentSession` per phase (context
  *    control) with skills narrowed to exactly the phase's bundled skill and
  *    tools narrowed to the phase allowlist (behavior control);
+ *  - {@link loadPhaseBrief} — the phase's bundled SKILL.md BODY, compiled into
+ *    the system prompt by the harness (SIBYL-017): runtime skill discovery is
+ *    never load-bearing; the narrowing above remains only as leak defense;
  *  - {@link createPhaseGuardExtension} — a `tool_call` veto that blocks writes
  *    outside the phase's path allowlist BEFORE they execute (invariant control).
  *
@@ -20,16 +23,16 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import type {
-  ExtensionFactory,
-  ToolCallEventResult,
-  ToolDefinition,
+import {
+  stripFrontmatter,
+  type ExtensionFactory,
+  type ToolCallEventResult,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
-import { COCKPIT_ORIGINATE_POINTER, COCKPIT_TOOLS } from "./conversation";
 import { createSibylEngineExtension } from "./extension";
 import {
   SIBYL_BUNDLED_SKILLS_DIR,
@@ -82,7 +85,11 @@ export interface PhaseSpec<Id extends string = PhaseId> {
   toolAllowlist: string[];
   /** Repo-relative path prefixes the phase may write (enforced by the guard). */
   pathAllowlist: string[];
-  /** Appended to the system prompt AFTER {@link SIBYL_PERSONA}. */
+  /**
+   * One-line phase ROLE LINE, appended to the system prompt AFTER
+   * {@link SIBYL_PERSONA} and BEFORE the compiled brief body of
+   * `skillName` (see {@link loadPhaseBrief}).
+   */
   promptBrief: string;
   /**
    * The phase's typed submit tool (SIBYL-014; the registry names it). The
@@ -106,16 +113,35 @@ export interface PhaseSpec<Id extends string = PhaseId> {
 }
 
 /**
- * The envision-phase brief. Like the originate pointer, it only ACTIVATES the
- * bundled skill from turn 1 — the flow's substance ships as the
- * `sibyl-envision` SKILL.md (arrives in SIBYL-015; the registry names it now).
+ * Tools the originate cockpit agent may use: read-only discovery, real file
+ * authoring (so the Goal/README the user sees is genuinely agent-built), and
+ * git. Owned by the registry (the kernel fixes WHAT the model may touch);
+ * re-exported by the conversation seam for its consumers.
+ */
+export const COCKPIT_TOOLS = ["read", "grep", "find", "ls", "write", "edit", "git"] as const;
+
+/**
+ * The originate-phase ROLE LINE (formerly the "thin pointer" that told the
+ * model to go READ the `sibyl-originate` SKILL.md — the runtime-discovery bet
+ * SIBYL-017 retires). One orienting sentence only: the flow's SUBSTANCE is the
+ * skill's body, compiled into the system prompt via {@link loadPhaseBrief} —
+ * by {@link bootPhaseSession} for a phase session, and by the cockpit's own
+ * boot for the conversation seam.
+ */
+export const COCKPIT_ORIGINATE_POINTER =
+  "You are in SIBYL's ORIGINATE COCKPIT, whose primary view is the project's README (its Goal): " +
+  "conduct the guided sibyl-originate flow, injected in full below, from turn 1.";
+
+/**
+ * The envision-phase ROLE LINE. One orienting sentence only: the flow's
+ * SUBSTANCE is the `sibyl-envision` SKILL.md body, which {@link bootPhaseSession}
+ * compiles into the system prompt via {@link loadPhaseBrief} (SIBYL-017) — the
+ * model never has to notice or read the skill file at runtime.
  */
 export const ENVISION_BRIEF =
-  "You are in SIBYL's ENVISION phase. The project's committed README is the focused Goal; your job is " +
-  "product-level framing on top of it. Before your first reply, use the `read` tool to load the " +
-  "`sibyl-envision` skill (its SKILL.md <location> is listed in your available skills) and CONDUCT " +
-  "that flow from turn 1. Do NOT write artifact files directly — when the framing is agreed, submit " +
-  "it with the `submit_envision` tool.";
+  "You are in SIBYL's ENVISION phase: the project's committed README is the focused Goal, and your " +
+  "job is product-level framing on top of it — conduct the sibyl-envision flow, injected in full " +
+  "below, completing ONLY via the `submit_envision` tool.";
 
 /**
  * AEP phase registry v1. DECLARED ORDER IS LOAD-BEARING: {@link detectPhase}
@@ -215,8 +241,57 @@ export function createFsArtifactProbe(cwd: string): ArtifactProbe {
 }
 
 // ---------------------------------------------------------------------------
-// (c) bootPhaseSession — a fresh, narrowed AgentSession per phase.
+// (c) loadPhaseBrief + bootPhaseSession — compiled brief, fresh narrowed session.
 // ---------------------------------------------------------------------------
+
+/**
+ * Load a phase's COMPILED BRIEF (SIBYL-017): the body of `<skillName>/SKILL.md`,
+ * frontmatter stripped, resolved ONLY inside harness-trusted skill roots
+ * ({@link SIBYL_BUNDLED_SKILLS_DIR} first, then `extraTrustedRoots` — the same
+ * roots {@link bootPhaseSession} trusts for skill narrowing). The first root
+ * containing the file wins.
+ *
+ * This is the delivery mechanism the Phase Pattern's invariant #2 mandates:
+ * the brief is INJECTED into the system prompt by the harness, so runtime
+ * skill discovery is never load-bearing — the model never has to notice or
+ * read a skill file. A missing, unreadable, or empty brief THROWS an explicit
+ * boot error naming the skill and the searched roots (no silent fallback:
+ * booting a phase without its judgment would be a worse failure than not
+ * booting at all).
+ */
+export function loadPhaseBrief(
+  skillName: string,
+  extraTrustedRoots: readonly string[] = [],
+): string {
+  const roots = [SIBYL_BUNDLED_SKILLS_DIR, ...extraTrustedRoots];
+  for (const root of roots) {
+    const briefPath = join(root, skillName, "SKILL.md");
+    if (!existsSync(briefPath)) {
+      continue;
+    }
+    let raw: string;
+    try {
+      raw = readFileSync(briefPath, "utf8");
+    } catch (error) {
+      throw new Error(
+        `loadPhaseBrief: the brief for skill "${skillName}" exists but could not be read ` +
+          `(${briefPath}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const body = stripFrontmatter(raw);
+    if (body.length === 0) {
+      throw new Error(
+        `loadPhaseBrief: the brief for skill "${skillName}" (${briefPath}) has no body ` +
+          "after stripping frontmatter — a phase cannot boot without its judgment.",
+      );
+    }
+    return body;
+  }
+  throw new Error(
+    `loadPhaseBrief: no SKILL.md found for skill "${skillName}" in any trusted root ` +
+      `(searched, in order: ${roots.join(", ")}).`,
+  );
+}
 
 /** Options for {@link bootPhaseSession}: the project dir + bootSession passthrough. */
 export interface BootPhaseSessionOptions extends BootSessionOptions {
@@ -242,7 +317,9 @@ export interface BootPhaseSessionOptions extends BootSessionOptions {
  *    `tools` allowlist AND `setActiveToolsByName`, which also rebuilds the
  *    system prompt so the narrowed skill/tool set is reflected immediately).
  *  - **Prompt**: {@link SIBYL_PERSONA} stays first (bootSession prepends it),
- *    followed by `spec.promptBrief`, then any caller fragments.
+ *    followed by `spec.promptBrief` (the phase role line), then the phase's
+ *    COMPILED BRIEF — the skill's SKILL.md body, injected deterministically
+ *    via {@link loadPhaseBrief} (SIBYL-017) — then any caller fragments.
  *  - **Guard**: {@link createPhaseGuardExtension} is ALWAYS bound, so writes
  *    outside `spec.pathAllowlist` are vetoed pre-execution.
  *
@@ -255,6 +332,9 @@ export async function bootPhaseSession(
 ): Promise<BootedSession> {
   const { cwd, completion, ...rest } = options;
   const trustedSkillRoots = [SIBYL_BUNDLED_SKILLS_DIR, ...(rest.additionalSkillPaths ?? [])];
+  // The compiled brief (SIBYL-017): resolved from the SAME trusted roots as the
+  // skill narrowing below, and thrown on absence BEFORE any session exists.
+  const briefBody = loadPhaseBrief(spec.skillName, rest.additionalSkillPaths ?? []);
   const booted = await bootSession(cwd, {
     ...rest,
     extensionFactories: [
@@ -269,7 +349,7 @@ export async function bootPhaseSession(
       // …but the invariant guard is ALWAYS bound, caller factories or not.
       createPhaseGuardExtension(spec),
     ],
-    appendSystemPrompt: [spec.promptBrief, ...(rest.appendSystemPrompt ?? [])],
+    appendSystemPrompt: [spec.promptBrief, briefBody, ...(rest.appendSystemPrompt ?? [])],
     skillsOverride: (base) => narrowToPhaseSkill(base, spec.skillName, trustedSkillRoots),
     tools: [...spec.toolAllowlist],
   });

@@ -12,8 +12,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { COCKPIT_TOOLS } from "../src/engine/conversation";
 import {
+  COCKPIT_TOOLS,
   PHASE_REGISTRY,
   type ArtifactProbe,
   type PhaseId,
@@ -24,8 +24,9 @@ import {
   detectPhase,
   evaluatePhaseToolCall,
   getPhaseSpec,
+  loadPhaseBrief,
 } from "../src/engine/flow";
-import { SIBYL_PERSONA, discoverSkills } from "../src/engine/session";
+import { SIBYL_BUNDLED_SKILLS_DIR, SIBYL_PERSONA, discoverSkills } from "../src/engine/session";
 
 /**
  * SIBYL-013 — the AEP orchestration kernel. These tests prove the kernel's
@@ -218,10 +219,14 @@ describe("bootPhaseSession (AC2) — one skill, exact tools", () => {
       // Active tools equal EXACTLY the phase allowlist.
       expect([...session.getActiveToolNames()].sort()).toEqual([...spec.toolAllowlist].sort());
 
-      // Persona first, phase brief after (identity precedes flow).
+      // SIBYL-017 ordering: persona → phase role line → compiled brief body.
       const appended = loader.getAppendSystemPrompt();
       expect(appended[0]).toBe(SIBYL_PERSONA);
-      expect(appended).toContain(spec.promptBrief);
+      expect(appended[1]).toBe(spec.promptBrief);
+      // The sibyl-originate SKILL.md BODY is injected verbatim — the model
+      // never has to notice/read the skill file (a distinctive body line).
+      expect(appended[2]).toContain("you run git, never the user");
+      expect(prompt).toContain("you run git, never the user");
     } finally {
       await session.dispose();
     }
@@ -250,12 +255,83 @@ describe("bootPhaseSession (AC2) — one skill, exact tools", () => {
         "submit_envision",
       ]);
 
+      // SIBYL-017 AC1+AC3 ordering: persona → phase role line → compiled
+      // brief body — the sibyl-envision SKILL.md BODY, injected verbatim.
       const appended = loader.getAppendSystemPrompt();
       expect(appended[0]).toBe(SIBYL_PERSONA);
-      expect(appended).toContain(spec.promptBrief);
+      expect(appended[1]).toBe(spec.promptBrief);
+      expect(appended[2]).toContain("Complete ONLY by calling `submit_envision`");
+      // Frontmatter is stripped: the injected entry carries no YAML keys.
+      expect(appended[2]).not.toContain("name: sibyl-envision");
+      expect(appended[2]).not.toContain("description:");
+
+      // The ASSEMBLED prompt carries the brief body itself — not just the
+      // Agent-Skills name listing — and no frontmatter leaks in.
+      expect(prompt).toContain("Complete ONLY by calling `submit_envision`");
+      expect(prompt).not.toContain("name: sibyl-envision");
     } finally {
       await session.dispose();
     }
+  });
+});
+
+// ─── SIBYL-017: loadPhaseBrief — deterministic brief injection ───────────────
+
+describe("loadPhaseBrief (SIBYL-017) — the compiled phase brief", () => {
+  it("returns the bundled skill's BODY with the frontmatter stripped", () => {
+    const body = loadPhaseBrief("sibyl-envision");
+
+    // Substance is present (distinctive body lines)…
+    expect(body).toContain("Complete ONLY by calling `submit_envision`");
+    expect(body).toContain("The README IS the envision context");
+    // …frontmatter is not: no delimiter, no YAML keys.
+    expect(body.startsWith("---")).toBe(false);
+    expect(body).not.toContain("name: sibyl-envision");
+    expect(body).not.toContain("description:");
+  });
+
+  it("resolves from an EXTRA trusted root (bundled roots win in declared order)", async () => {
+    const skillsDir = await mkdtemp(join(tmpdir(), "sibyl-brief-roots-"));
+    try {
+      await mkdir(join(skillsDir, "sibyl-extra"));
+      await writeFile(
+        join(skillsDir, "sibyl-extra", "SKILL.md"),
+        "---\nname: sibyl-extra\ndescription: Extra-root brief.\n---\n\nExtra-root brief body.\n",
+      );
+      expect(loadPhaseBrief("sibyl-extra", [skillsDir])).toBe("Extra-root brief body.");
+    } finally {
+      await rm(skillsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT resolve briefs from untrusted locations (only the given roots are searched)", () => {
+    // The user project's decoy skill exists on disk, but its root is never trusted.
+    expect(() => loadPhaseBrief("user-decoy")).toThrow(/no SKILL\.md found/);
+  });
+
+  it("a missing brief throws an explicit error naming the skill and the searched roots", () => {
+    expect(() => loadPhaseBrief("sibyl-nonexistent")).toThrow(
+      /loadPhaseBrief: no SKILL\.md found for skill "sibyl-nonexistent"/,
+    );
+    expect(() => loadPhaseBrief("sibyl-nonexistent")).toThrow(SIBYL_BUNDLED_SKILLS_DIR);
+
+    const extraRoot = "/tmp/sibyl-extra-trusted-root";
+    expect(() => loadPhaseBrief("sibyl-nonexistent", [extraRoot])).toThrow(extraRoot);
+  });
+
+  it("bootPhaseSession REFUSES to boot a phase whose brief is missing (no silent fallback)", async () => {
+    const briefless: PhaseSpec<"briefless"> = {
+      id: "briefless",
+      entryCondition: () => true,
+      skillName: "sibyl-has-no-skill-md",
+      toolAllowlist: ["read"],
+      pathAllowlist: [],
+      promptBrief: "Test-only phase with no bundled SKILL.md.",
+      completionToolName: null,
+    };
+    await expect(bootPhaseSession(briefless, { cwd: userProject })).rejects.toThrow(
+      /no SKILL\.md found for skill "sibyl-has-no-skill-md"/,
+    );
   });
 });
 
@@ -418,6 +494,13 @@ describe("kernel generality (AC4) — a new phase is only a registry entry", () 
         expect(session.systemPrompt).toContain("<name>sibyl-map</name>");
         expect(session.systemPrompt).not.toContain("user-decoy");
         expect([...session.getActiveToolNames()].sort()).toEqual(["read", "write"]);
+
+        // SIBYL-017: the dummy phase's brief BODY is injected from the extra
+        // trusted root — persona → role line → body, with zero kernel changes.
+        const appended = loader.getAppendSystemPrompt();
+        expect(appended[0]).toBe(SIBYL_PERSONA);
+        expect(appended[1]).toBe(dummy.promptBrief);
+        expect(appended[2]).toBe("Dummy map skill body.");
       } finally {
         await session.dispose();
       }
