@@ -227,7 +227,7 @@ describe("bootPhaseSession (AC2) — one skill, exact tools", () => {
     }
   });
 
-  it("envision session: only sibyl-envision, no skill leak, read-only tools", async () => {
+  it("envision session: only sibyl-envision, no skill leak, read-only tools + submit_envision", async () => {
     const spec = getPhaseSpec("envision");
     const { session, loader } = await bootPhaseSession(spec, { cwd: userProject });
 
@@ -239,9 +239,16 @@ describe("bootPhaseSession (AC2) — one skill, exact tools", () => {
       expect(prompt).not.toContain("user-decoy");
       expect(prompt).not.toContain("sibyl-originate");
 
-      // `submit_envision` is named by the registry but its tool arrives in
-      // SIBYL-014; the SDK ignores unknown names until it is registered.
-      expect([...session.getActiveToolNames()].sort()).toEqual(["find", "grep", "ls", "read"]);
+      // `submit_envision` (SIBYL-014) is built by the registry entry's
+      // completionToolFactory and registered by bootPhaseSession, so the
+      // active tools are the read-only set PLUS the typed completion tool.
+      expect([...session.getActiveToolNames()].sort()).toEqual([
+        "find",
+        "grep",
+        "ls",
+        "read",
+        "submit_envision",
+      ]);
 
       const appended = loader.getAppendSystemPrompt();
       expect(appended[0]).toBe(SIBYL_PERSONA);
