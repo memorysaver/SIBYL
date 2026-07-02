@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 10
+dispatch_epoch: 11
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -784,7 +784,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 1
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "feat/sibyl-013-aep-flow-kernel"
     openspec_change: "SIBYL-013"
@@ -815,6 +815,7 @@ stories:
       unit: ["detectPhase predicate table", "sessionSpec -> prompt/tools narrowing", "guard allow/deny matrix"]
       integration: ["a scripted envision-phase session cannot write product-context.yaml but can call its submit tool"]
       contract: ["phase registry entry shape (typebox) validated"]
+    completion_notes: "MERGED be97c74 (2026-07-02): flow.ts 455 lines + 35 tests (135 total green, tsc clean). Skill narrowing = DefaultResourceLoader skillsOverride post-discovery filter - keep only name==spec.skillName AND filePath under harness-trusted roots (SIBYL_BUNDLED_SKILLS_DIR + caller additionalSkillPaths); user-git-root skills can never leak in, even name-shadowed. Guard: per-tool path extraction (write/edit input.path|file_path; git init/add/commit pathspecs with -m/-F value skipping), default-deny unknown write-capable tools, completionToolName exempt, ctx.cwd resolved at call time. detectPhase THROWS beyond registered phases (explicit > silent misroute). SDK facts: CreateAgentSessionOptions.tools doubles as allowlist+initial-active and silently ignores unknown names (forward-compatible for submit_envision before SIBYL-014); setActiveToolsByName forces a system-prompt rebuild."
 
   - id: SIBYL-014
     title: "Typed phase completion - submit_envision structured tool; harness writes + commits product/index.yaml"
@@ -825,10 +826,10 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: pending
+    status: in_progress
     readiness_score: 0.9
-    assigned_to: null
-    openspec_change: null
+    assigned_to: "feat/sibyl-014-submit-envision"
+    openspec_change: "SIBYL-014"
     priority: critical
     business_value: 9
     complexity: M
@@ -865,10 +866,10 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: pending
+    status: in_progress
     readiness_score: 0.85
-    assigned_to: null
-    openspec_change: null
+    assigned_to: "feat/sibyl-015-envision-skill"
+    openspec_change: "SIBYL-015"
     priority: high
     business_value: 7
     complexity: S
@@ -1455,4 +1456,16 @@ changelog:
     type: dispatch
     author: agent
     summary: "Dispatch epoch 10 (full-auto run, L1 wave 1): locked SIBYL-013 (orchestration kernel, shared enabler) -> in_progress on feat/sibyl-013-aep-flow-kernel; implementation delegated to a worktree subagent per the control-on-main/imp-on-subagent rule. Waves 2 (SIBYL-014+015) and 3 (SIBYL-016) queue behind it."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: story_completed
+    author: agent
+    summary: "SIBYL-013 (AepFlow orchestration kernel v1) merged @be97c74: phase registry + detectPhase artifact routing + phase-scoped sessions (trusted-roots skillsOverride narrowing) + tool_call invariant guard (default-deny, per-tool path extraction). 135 tests green (+35), tsc clean. All 4 acceptance criteria proven headlessly, incl. the generalization criterion (dummy phase = registry entry only)."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: dispatch
+    author: agent
+    summary: "Dispatch epoch 11 (L1 wave 2, parallel): SIBYL-014 (submit_envision typed completion) -> feat/sibyl-014-submit-envision and SIBYL-015 (sibyl-envision bundled skill) -> feat/sibyl-015-envision-skill; no files_affected overlap, both to worktree subagents."
     sections_changed: ["stories"]
