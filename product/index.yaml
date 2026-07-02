@@ -171,7 +171,7 @@ product:
       outcome_contract: null
     - layer: 2
       name: "Story-map + routing (legibility test)"
-      user_can: "After envision, drive /skill:aep-map to forge the story graph, and the UI CONVERTS to a user-story-mapping interface showing the AEP journey across lifecycle/layers with live status; detect-state routing resumes at the right step. The 'second person follows unaided' and team-alignment hypotheses are tested here."
+      user_can: "After envision, drive /skill:aep-map to forge the story graph, and the UI CONVERTS to a user-story-mapping interface showing the AEP journey across lifecycle/layers with live status; detect-state routing resumes at the right step. The 'second person follows unaided' and team-alignment hypotheses are tested here. [REFINED 2026-07-02, user directive] The story map is rendered by the LEGIBILITY engine - a static-analysis-first pipeline (YAML/git -> deterministic ProjectModel -> ASCII grid aligned to human cognition), never dependent on model output for rendering."
       outcome_contract: null
     - layer: 3
       name: "Scaffold (architecture-proof gate)"
@@ -179,7 +179,7 @@ product:
       outcome_contract: null
     - layer: 4
       name: "Story execution"
-      user_can: "Drive one story through design->build->wrap->reflect via Pi, streaming progress."
+      user_can: "Drive one story through design->build->wrap->reflect via Pi, streaming progress. [REFINED 2026-07-02, user directive] While a story executes, the LEGIBILITY engine continuously surfaces that story's structural impact - files/modules touched, exported-symbol and spec deltas - as a live ASCII panel, so the human tracks WHAT the story is changing, not just that it is running."
       outcome_contract: null
     - layer: 5
       name: "Pluggable memory"

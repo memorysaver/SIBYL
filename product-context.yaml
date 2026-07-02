@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 9
+dispatch_epoch: 10
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -16,7 +16,7 @@ calibration:
       dimensions: ["ux-flow"]
       trigger: "After the L0 modal-form walking skeleton runs end-to-end - calibrate the form IA / layout before extending the UI."
     - layer: 1
-      dimensions: ["scope-direction"]
+      dimensions: ["scope-direction"] # FULFILLED 2026-07-02 - see history (full-auto mandate + kernel architecture + legibility engine)
       trigger: "While driving envision (re-sliced to L1, 2026-07-02) - confirm product scope / direction as it sharpens."
     - layer: 3
       dimensions: ["object-model"]
@@ -29,6 +29,13 @@ calibration:
       artifact_path: "product/maps/guided-aep-journey-tui/object-map.yaml"
       sections_updated: ["stories"]
       summary: "Approved object-first IA for guided-aep-journey-tui - 3 primary objects (Project/Vision/Agent Run), 1 task-flow exception (originate = task_oriented wizard). Story-map objects deferred to L3."
+    - dimension: scope-direction
+      calibrated_at: 2026-07-02
+      calibrated_from_layer: 1
+      mode: establishment
+      artifact_path: null
+      sections_updated: ["topology", "architecture", "stories"]
+      summary: "User directive before the L1->L6 run: (1) FULL-AUTO through L6 - the agent judges layer gates; live dogfoods only at milestone gates L2/L4/L6. (2) Determinism architecture: steps are controlled by a HARNESS orchestration kernel (phase state machine + phase-scoped Pi sessions + tool_call guard + typed submit tools), with skills injected per phase for judgment only - answers the 'pure agent skills are unstable' concern via the SDK's own primitives. (3) New LEGIBILITY engine (static-analysis-first ASCII visualization aligned to human cognition - user-story-map grid + per-story structural/spec deltas; optional LLM annotator; SVG export later) lands at L2 + L4. (4) TUI product first; cloud visualization deferred to L7."
 
 # ─── ARCHITECTURE (System Map) ───────────────────────────────────
 architecture:
@@ -59,6 +66,9 @@ architecture:
         - "EngineEvent: phase_changed | progress | form_requested | decision_requested | run_completed | run_failed"
         - "EngineCommand: start_run | submit_form | submit_decision | abort"
         - "tool gating via setActiveTools (read-only -> +git)"
+        - "ORCHESTRATION KERNEL (L1+): AepFlow - typed phase registry + detectPhase(cwd) artifact predicates (deterministic detect-state routing); one FRESH phase-scoped AgentSession per AEP phase (skillsOverride -> exactly that phase's bundled skill; tools allowlist via CreateAgentSessionOptions.tools + setActiveToolsByName; appendSystemPrompt = persona + phase brief)"
+        - "INVARIANT GUARD: extension `tool_call` handler vetoes ({block, reason}) calls outside the phase's tool/path allowlist - the model cannot free-write control-plane artifacts"
+        - "TYPED PHASE COMPLETION: per-phase submit_<phase> custom tool (TypeBox schema = the phase's output contract; invalid input -> isError result, model retries); the HARNESS serializes/writes/commits the artifact and advances the state machine - determinism lives in the harness, judgment lives in the skill"
     - name: renderer
       kind: ui
       responsibility: "The TUI. Consumes EngineEvents; renders the UI-mode state machine (form-mode -> story-map-mode later); collects form input + decisions; streams live progress."
@@ -69,10 +79,12 @@ architecture:
         - "input + progress widgets"
       depends_on:
         - engine
+        - legibility
       technology: "@earendil-works/pi-tui"
       key_concepts:
         - "modal form (ctx.ui.custom / pi-tui components), NOT a chat transcript"
         - "live progress from progress events (tool activity + streaming text)"
+        - "L2+: story-map / architecture tabs render PREFORMATTED ASCII views produced by the legibility module (pi-tui Text renders multi-line strings without reflow)"
     - name: tools
       kind: backend
       responsibility: "SIBYL-owned narrow agent tools the engine exposes to Pi - v0: a git tool (init/add/commit). The trust boundary (what the agent may run)."
@@ -93,6 +105,19 @@ architecture:
       technology: null
       key_concepts:
         - "appendDecision / recallDecisions over pi.appendEntry (no abstraction in v0)"
+    - name: legibility
+      kind: shared
+      responsibility: "Static-analysis-first visualization pipeline: parses product/index.yaml + product-context.yaml + git state + the TS import graph (typescript compiler API) into a deterministic ProjectModel, then renders ASCII/Unicode views aligned to human cognition - the user-story-map grid (backbone activities x layers with live story status), the architecture module graph, and per-story structural/spec delta panels (what a running story changes in code structure + specs). An OPTIONAL LLM annotator subagent decorates nodes with one-line summaries (cached, never blocks rendering). SVG export from the same ProjectModel later; the L7 web surface renders the same model."
+      does_not: "Depend on the Pi SDK or pi-tui (pure library - deterministic, renderer- and host-agnostic); block rendering on any model call; own UI layout (renderer does)."
+      owns:
+        - "ProjectModel (activities x layers x stories + module graph + per-story delta)"
+        - "ASCII renderers (story-map grid, module graph, story delta panel)"
+        - "static extractors (YAML, git, ts import graph)"
+      depends_on: []
+      technology: "typescript compiler API + yaml package (both already in-tree; no new deps)"
+      key_concepts:
+        - "static-analysis-first: rendering NEVER depends on LLM output (stability by construction)"
+        - "recomputed on artifact_changed events / git commits"
   domain_model:
     - name: DecisionEntry
       purpose: "A captured human decision during a run (the decision-memory primitive)."
@@ -749,6 +774,168 @@ stories:
       integration: ["cockpit run loads the bundled originate skill (not the hardcoded brief)"]
       contract: []
 
+  # ── LAYER 1 (Envision) — decomposed 2026-07-02 under the full-auto mandate ──
+  - id: SIBYL-013
+    title: "Orchestration kernel v1 - AepFlow phase state machine + phase-scoped sessions + invariant guard"
+    layer: 1
+    module: engine
+    activity: envision
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 1
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "feat/sibyl-013-aep-flow-kernel"
+    openspec_change: "SIBYL-013"
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: shared_enabler
+    change_group: null
+    dependencies: []
+    description:
+      what_changes: "The determinism kernel the whole L1->L6 run stands on (apps/harness/src/engine/flow.ts). (a) A typed PHASE REGISTRY: each AEP phase = { id, entryCondition (pure artifact predicates over cwd: README committed? product/index.yaml present? ...), sessionSpec (skill name, tool allowlist, path allowlist, prompt brief), completionToolName }. (b) detectPhase(cwd): deterministic detect-state routing - a pure function of on-disk artifacts choosing the active phase (originate when no committed README; envision when README committed but no product/index.yaml). (c) bootPhaseSession(spec): a FRESH AgentSession per phase via the existing bootSession, with skillsOverride/additionalSkillPaths narrowed to EXACTLY the phase's bundled skill, tools restricted via CreateAgentSessionOptions.tools + setActiveToolsByName, and appendSystemPrompt = SIBYL persona + phase brief. (d) INVARIANT GUARD: an extension `tool_call` handler bound to every phase session that vetoes ({ block: true, reason }) any write/edit/git call whose target path falls outside the phase's path allowlist."
+      why: "USER DIRECTIVE 2026-07-02: pure skill injection was not stable enough - step determinism must be controlled by the harness through the Pi SDK's own primitives (fresh session per phase = context control; tool/skill narrowing = behavior control; tool_call veto = invariant control), while skills carry only the judgment. Confirmed against Pi SDK 0.80.2 types: ToolCallEventResult{block,reason}, concurrent AgentSessions with per-session cwd, TypeBox-validated custom tools."
+    acceptance_criteria:
+      - "detectPhase is a pure function of artifacts: returns 'originate' for a dir with no committed README, 'envision' for a committed README with no product/index.yaml - same inputs, same answer, proven by headless tests."
+      - "A phase session's assembled system prompt surfaces ONLY that phase's skill in the Agent-Skills block, and its active tools equal exactly the phase's allowlist."
+      - "The guard blocks a disallowed call (e.g. write to product-context.yaml from an envision-phase session) with a structured reason the model can read, and allows in-allowlist calls through - proven with a scripted session double."
+      - "The kernel API generalizes: registering a new phase (map, scaffold) requires only a new registry entry + bundled skill, no kernel changes."
+    interface_obligations:
+      implements: ["AepFlow phase registry", "detectPhase(cwd)", "bootPhaseSession(spec)", "guard extension (tool_call veto)"]
+      consumes: ["bootSession (session.ts)", "Pi ExtensionAPI tool_call event", "CreateAgentSessionOptions.tools / skillsOverride"]
+      contract_tests_required: true
+    files_affected:
+      - "apps/harness/src/engine/flow.ts (new)"
+      - "apps/harness/src/engine/session.ts (options threading only)"
+      - "apps/harness/test/flow.test.ts (new)"
+    technical_notes: "SDK facts (researched 2026-07-02, Pi 0.80.2): extension `tool_call` handlers may return { block?: boolean; reason?: string } to veto a call pre-execution; gating is by NAME only at session level, so PATH-level rules live in the guard handler; multiple AgentSessions coexist in one process, each with its own cwd + sessionManager (proper-lockfile per session file) - the same primitive later used for worktree-bound story subagents (L6). Keep flow.ts SDK-typed but renderer-free (ADR-001)."
+    verification:
+      unit: ["detectPhase predicate table", "sessionSpec -> prompt/tools narrowing", "guard allow/deny matrix"]
+      integration: ["a scripted envision-phase session cannot write product-context.yaml but can call its submit tool"]
+      contract: ["phase registry entry shape (typebox) validated"]
+
+  - id: SIBYL-014
+    title: "Typed phase completion - submit_envision structured tool; harness writes + commits product/index.yaml"
+    layer: 1
+    module: engine
+    activity: envision
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 2
+    status: pending
+    readiness_score: 0.9
+    assigned_to: null
+    openspec_change: null
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-013"]
+    description:
+      what_changes: "createSubmitTool(phase) factory (engine): a per-phase custom tool whose TypeBox parameters schema IS the phase's output contract. For envision, submit_envision takes the structured product framing (problem, personas[], activities[] with order+layer_introduced, layers[] with user_can, mvp_boundary in/out) - the model NEVER free-writes YAML. On a valid call the HARNESS serializes canonical product/index.yaml, writes it, git-commits it (narrow git path), emits phase_completed{envision} + a decision entry, and the AepFlow state machine advances. Invalid input returns isError content so the model retries."
+      why: "The second determinism lever: artifact writes go through typed, schema-validated tools owned by the harness. TypeBox validation + model-retry is native to Pi custom tools (validated against the parameters schema before execute)."
+    acceptance_criteria:
+      - "submit_envision rejects schema-invalid payloads with actionable error content (missing/wrong-typed fields named), session remains in the envision phase."
+      - "On a valid payload the harness writes product/index.yaml that parses as YAML and round-trips the submitted structure, commits it, and emits phase_completed + decision_captured."
+      - "With the SIBYL-013 guard active, the envision session provably CANNOT produce product/index.yaml by raw write - the ONLY path is submit_envision (test: raw write blocked, submit succeeds)."
+    interface_obligations:
+      implements: ["createSubmitTool(phase, schema, writer)", "submit_envision"]
+      consumes: ["AepFlow (SIBYL-013)", "Pi ToolDefinition (TypeBox parameters)", "git tool / decision sink (SIBYL-011)"]
+      contract_tests_required: true
+    files_affected:
+      - "apps/harness/src/engine/submit.ts (new)"
+      - "apps/harness/src/engine/flow.ts (wire completion)"
+      - "apps/harness/test/submit.test.ts (new)"
+    technical_notes: "Pi validates tool input against `parameters` (TypeBox) and surfaces schema errors to the model for retry; AgentToolResult{ content, isError } is the retry channel for semantic errors. Keep the envision output schema aligned with the existing product/index.yaml shape (split-mode product definition: opportunity/personas/product.activities/product.layers/mvp_boundary) so SIBYL-generated projects are AEP-compatible from birth."
+    verification:
+      unit: ["schema reject/accept table", "YAML round-trip", "phase advance only on valid submit"]
+      integration: ["scripted session: raw write blocked + submit path succeeds end-to-end"]
+      contract: ["submit_envision parameters schema matches the documented envision output contract"]
+
+  - id: SIBYL-015
+    title: "sibyl-envision bundled skill - conduct aep-envision from the originate README"
+    layer: 1
+    module: engine
+    activity: envision
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 2
+    status: pending
+    readiness_score: 0.85
+    assigned_to: null
+    openspec_change: null
+    priority: high
+    business_value: 7
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-013"]
+    description:
+      what_changes: "apps/harness/skills/sibyl-envision/SKILL.md - a CLI-bundled Pi skill (SIBYL-012 pattern: just add the dir, no harness code change) adapting /aep-envision's interview essence for the cockpit conductor: treat the COMMITTED README as THE envision context; interview to fill gaps (opportunity sharpening, personas, activity backbone, layer slicing, MVP boundary); propose the framing for approval; then finish by calling submit_envision with the structured payload - never raw-writing YAML."
+      why: "'Conduct, don't reimplement' - the judgment content comes from AEP's envision skill, packaged as the ONE skill the envision phase session carries (skillsOverride). The kernel provides the rails; this skill provides the interview."
+    acceptance_criteria:
+      - "The skill is discovered via the existing bundled-skills dir (additionalSkillPaths) with NO harness code change - proving the SIBYL-012 generalization criterion."
+      - "The skill body instructs: README = envision context; ask-before-write focusing interview; propose framing; complete ONLY via submit_envision."
+      - "bundled-skill tests extended: an envision-phase session surfaces ONLY sibyl-envision in its Agent-Skills block."
+    interface_obligations:
+      implements: ["sibyl-envision SKILL.md"]
+      consumes: [".claude/skills/aep-envision (content source)", "SIBYL-013 phase registry (binding)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/skills/sibyl-envision/SKILL.md (new)"
+      - "apps/harness/test/bundled-skill.test.ts (extend)"
+    technical_notes: "Derive the interview structure from .claude/skills/aep-envision/SKILL.md (opportunity -> personas -> activities -> layers -> mvp_boundary) but scope it to what submit_envision's schema needs - the cockpit envision is one guided conversation, not the full multi-phase doc. Frontmatter: name sibyl-envision + description; keep model-invocable within the phase session (it is the ONLY skill there)."
+    verification:
+      unit: ["skill discovered from bundled dir", "phase session surfaces only this skill"]
+      integration: []
+      contract: []
+
+  - id: SIBYL-016
+    title: "Cockpit envision integration - detect-state routing, live framing render, journey 02"
+    layer: 1
+    module: renderer
+    activity: envision
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 3
+    status: pending
+    readiness_score: 0.85
+    assigned_to: null
+    openspec_change: null
+    priority: high
+    business_value: 8
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-013", "SIBYL-014", "SIBYL-015"]
+    description:
+      what_changes: "Wire the kernel into the cockpit: on boot, detectPhase(cwd) chooses the conversation's phase session (README committed + no product/index.yaml -> envision; else originate as today). The Architecture tab renders product/index.yaml live once submit_envision lands (YAML -> readable outline; re-render on artifact_changed, same mechanism as the Goal/README tab). Envision completion is captured as a decision (existing sink). Authors skills/e2e-test/journeys/02-cockpit-envision.md: scenario 02.1 zero-quota render smoke (envision phase boots, tabs render) + 02.2 live guided envision (vague README -> interview -> schema-valid committed product/index.yaml) - 02.2 EXECUTION deferred to the L2 milestone gate per dogfood live_policy."
+      why: "Closes L1's user_can: drive envision through the SDK from the originate README, observed live in the cockpit. Detect-state routing surfaces the kernel's determinism to the user (resume at the right step)."
+    acceptance_criteria:
+      - "Cockpit in a repo with a committed README and no product/index.yaml enters the ENVISION phase: chat greets as the envision conductor and the session's prompt carries sibyl-envision (not sibyl-originate) - headless test via scripted double + live render smoke."
+      - "After submit_envision completes, the Architecture tab re-renders showing the framing (activities + layers visible) without a restart."
+      - "Journey 02 file exists in the BDD journey shape with a structural Verify (product/index.yaml parses; has product.activities + product.layers; committed), and scenario 02.1 (zero-quota render smoke) passes via shell-use."
+    interface_obligations:
+      implements: ["cockpit phase routing", "Architecture tab envision render", "journeys/02-cockpit-envision.md"]
+      consumes: ["AepFlow.detectPhase (SIBYL-013)", "submit_envision events (SIBYL-014)", "sibyl-envision skill (SIBYL-015)", "conversation seam artifact_changed"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/src/renderer/cockpit.ts"
+      - "skills/e2e-test/journeys/02-cockpit-envision.md (new)"
+      - "apps/harness/test/cockpit.test.ts (extend)"
+    technical_notes: "Per process_learnings: UI stories MUST require the interactive surface to be launchable + render-smoked, not just headless logic - scenario 02.1 is that requirement. The live 02.2 dogfood is deliberately deferred to the L2 milestone gate (live_policy: milestone_gates_only); the L1 gate closes on scripted tiers + the zero-quota smoke."
+    verification:
+      unit: ["phase routing on boot (scripted)", "tab re-render on artifact_changed"]
+      integration: ["zero-quota render smoke via shell-use (02.1)"]
+      contract: []
+
 # ─── WAVES (execution slices within Layer 0) ─────────────────────
 waves:
   - layer: 0
@@ -771,6 +958,18 @@ waves:
     wave: 5
     stories: ["SIBYL-008"]
     theme: "End-to-end Originate integration (walking skeleton)"
+  - layer: 1
+    wave: 1
+    stories: ["SIBYL-013"]
+    theme: "Orchestration kernel v1 - deterministic phase control (state machine + scoped sessions + guard)"
+  - layer: 1
+    wave: 2
+    stories: ["SIBYL-014", "SIBYL-015"]
+    theme: "Typed envision completion + sibyl-envision bundled skill"
+  - layer: 1
+    wave: 3
+    stories: ["SIBYL-016"]
+    theme: "Cockpit envision integration (detect-state routing + live render + journey 02)"
 
 # ─── TOPOLOGY ────────────────────────────────────────────────────
 topology:
@@ -816,11 +1015,11 @@ topology:
     concurrency_limit: 3
     conflict_detection: files_affected_overlap
     retry: "2x same agent -> failure analyst -> fresh agent -> human escalation"
-    autonomous: true # enabled for /aep-autopilot; full_auto stays false so strategic gates (design, L0 layer gate, outcome eval) still pause for the human
-    auto_design: false
+    autonomous: true
+    auto_design: true # implied by full_auto
     skip_human_eval: none
-    full_auto: false
-    auto_outcome_eval: none
+    full_auto: true # USER MANDATE 2026-07-02: drive L1->L6 (Envision -> Subagent orchestration) full-auto; the agent judges layer gates + outcome contracts itself, pausing only for genuine conflicts / calibration-worthy taste decisions. L7 (cloud/web) stays out of scope until the TUI product is complete.
+    auto_outcome_eval: quantitative # qualitative metrics also auto-judged while full_auto is true (full_auto implies the finer flags)
     deploy_targets:
       staging_url: null
       production_url: null
@@ -828,6 +1027,7 @@ topology:
       method: auto
       post_deploy_env: none
       on_issue: create_story
+      live_policy: milestone_gates_only # USER 2026-07-02: live Codex dogfoods (shell-use TTY, ChatGPT quota) only at the L2 / L4 / L6 gates; other gates use zero-quota render smokes + scripted tiers
     post_merge_guard:
       window_min: 15
       auto_revert: false
@@ -918,6 +1118,23 @@ layer_gates:
       tests_failed: 0
       failures: []
     completed_at: 2026-07-02
+
+  - layer: 1
+    status: pending
+    test_definition: "In a repo whose README was committed by originate (and no product/index.yaml), `sibyl cockpit` deterministically enters the ENVISION phase (detect-state routing); the phase session carries ONLY the sibyl-envision skill + gated tools; a guided interview turns the README into a schema-valid product/index.yaml written + committed BY THE HARNESS via submit_envision (never free-written by the model); the Architecture tab re-renders the framing live; the guard provably blocks out-of-allowlist writes."
+    journeys:
+      - skills/e2e-test/journeys/01-cockpit-guided-originate.md # regression (zero-quota render half)
+      - skills/e2e-test/journeys/02-cockpit-envision.md # authored by SIBYL-016; 02.1 render smoke runs at THIS gate, 02.2 LIVE half deferred to the L2 milestone gate (dogfood live_policy: milestone_gates_only)
+    coverage:
+      criteria_total: 13
+      criteria_covered: 0
+      uncovered: ["all - layer not started"]
+    evidence:
+      scripted: null
+      journeys: []
+      matrix: docs/layer-gates/1.md
+    results: null
+    completed_at: null
 
 # ─── COST ────────────────────────────────────────────────────────
 cost:
@@ -1221,3 +1438,21 @@ changelog:
       - layer_gates
       - topology
       - changelog
+
+  - date: 2026-07-02
+    type: calibration
+    author: human + agent
+    summary: "scope-direction calibration (light, inline) fulfilled the planned L1 checkpoint: user mandated FULL-AUTO L1->L6 with live dogfoods at milestone gates (L2/L4/L6) only; set the determinism architecture (a harness orchestration kernel conducts AEP phases through Pi SDK primitives - phase state machine, phase-scoped sessions, tool_call guard, typed submit tools - skills carry judgment only); added the LEGIBILITY engine to the map (L2 story-map ASCII + L4 per-story structural/spec deltas; static-analysis-first; SVG + cloud rendering deferred to L7)."
+    sections_changed: ["calibration", "topology"]
+
+  - date: 2026-07-02
+    type: map_update
+    author: agent
+    summary: "L1 (Envision) decomposed into 4 stories across 3 waves - SIBYL-013 orchestration kernel (shared enabler), SIBYL-014 typed submit_envision, SIBYL-015 sibyl-envision bundled skill, SIBYL-016 cockpit integration + journey 02. Architecture amended: engine gains the ORCHESTRATION KERNEL concepts (AepFlow phase registry, detectPhase artifact routing, phase-scoped sessions, tool_call invariant guard, typed phase-completion tools - all confirmed against the Pi SDK 0.80.2 type surface: ToolCallEventResult{block,reason}, concurrent per-cwd AgentSessions, TypeBox-validated custom tools); new LEGIBILITY module (static-analysis-first ASCII pipeline; renderer depends on it). Layer gate 1 defined (zero-quota + scripted; live half rides the L2 milestone gate)."
+    sections_changed: ["architecture", "stories", "waves", "layer_gates"]
+
+  - date: 2026-07-02
+    type: dispatch
+    author: agent
+    summary: "Dispatch epoch 10 (full-auto run, L1 wave 1): locked SIBYL-013 (orchestration kernel, shared enabler) -> in_progress on feat/sibyl-013-aep-flow-kernel; implementation delegated to a worktree subagent per the control-on-main/imp-on-subagent rule. Waves 2 (SIBYL-014+015) and 3 (SIBYL-016) queue behind it."
+    sections_changed: ["stories"]
