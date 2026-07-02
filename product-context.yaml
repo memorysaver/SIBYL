@@ -69,6 +69,8 @@ architecture:
         - "ORCHESTRATION KERNEL (L1+): AepFlow - typed phase registry + detectPhase(cwd) artifact predicates (deterministic detect-state routing); one FRESH phase-scoped AgentSession per AEP phase (skillsOverride -> exactly that phase's bundled skill; tools allowlist via CreateAgentSessionOptions.tools + setActiveToolsByName; appendSystemPrompt = persona + phase brief)"
         - "INVARIANT GUARD: extension `tool_call` handler vetoes ({block, reason}) calls outside the phase's tool/path allowlist - the model cannot free-write control-plane artifacts"
         - "TYPED PHASE COMPLETION: per-phase submit_<phase> custom tool (TypeBox schema = the phase's output contract; invalid input -> isError result, model retries); the HARNESS serializes/writes/commits the artifact and advances the state machine - determinism lives in the harness, judgment lives in the skill"
+        - "DETERMINISTIC BRIEF INJECTION (user refinement 2026-07-02, docs/decisions/aep-conduct-mechanisms.md): PROCEDURE is code, JUDGMENT is a prompt-COMPILED brief - phase briefs are authored as bundled md files but injected via appendSystemPrompt by the harness (runtime skill discovery/invocation is never load-bearing; skillsOverride narrowing kept as leak defense). Determinism ladder per phase: compiled brief -> typed completion -> programmatic steer nudges -> scripted micro-turns."
+        - "STORY WORKERS (L4/L6): one INDEPENDENT OS PROCESS per story (`sibyl worker --story --worktree`, headless Pi session; crash-isolated; spawn/liveness/kill/worktree lifecycle harness-owned) - tmux / claude-bg style: observable via session JSONL + signals, cockpit can ATTACH to a live worker view + steer via session.steer()"
     - name: renderer
       kind: ui
       responsibility: "The TUI. Consumes EngineEvents; renders the UI-mode state machine (form-mode -> story-map-mode later); collects form input + decisions; streams live progress."
@@ -896,6 +898,46 @@ stories:
       integration: []
       contract: []
 
+  - id: SIBYL-017
+    title: "Deterministic brief injection - phase briefs compiled into the system prompt (skill file = authoring format, not a runtime bet)"
+    layer: 1
+    module: engine
+    activity: envision
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 3
+    status: pending
+    readiness_score: 0.9
+    assigned_to: null
+    openspec_change: null
+    priority: critical
+    business_value: 8
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-013", "SIBYL-015"]
+    description:
+      what_changes: "Per docs/decisions/aep-conduct-mechanisms.md: bootPhaseSession(spec) READS the phase's bundled brief body (the SKILL.md file, minus frontmatter) and APPENDS it to the system prompt (after the persona + promptBrief), so phase conduct is ALWAYS present - never dependent on the model choosing to read a skill file. The Agent-Skills discovery path stays only as leak defense (skillsOverride narrowing unchanged); the originate cockpit path migrates too (COCKPIT_ORIGINATE_POINTER's thin-pointer bet replaced by direct injection of sibyl-originate's body)."
+      why: "USER REFINEMENT 2026-07-02: stability first - runtime skill discovery adds two nondeterministic steps (the model must notice the skill, then read it) for content that is MANDATORY for a phase the harness already chose. Compiling the brief into the prompt removes the bet; the md file remains the authoring/versioning unit derived from the AEP skills."
+    acceptance_criteria:
+      - "An envision-phase session's assembled system prompt CONTAINS the sibyl-envision brief body verbatim (not just the Agent-Skills listing) - headless test on the prompt assembly."
+      - "The originate cockpit session likewise carries the sibyl-originate body directly; the thin-pointer constant is retired or reduced to a one-line role line."
+      - "Frontmatter is stripped; persona remains index 0; ordering is persona -> phase promptBrief -> brief body; a missing brief file is an explicit boot error (no silent fallback)."
+    interface_obligations:
+      implements: ["loadPhaseBrief(skillName)", "brief injection in bootPhaseSession", "originate migration"]
+      consumes: ["flow.ts PhaseSpec (SIBYL-013)", "bundled skills dir (SIBYL-012/015)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/flow.ts"
+      - "apps/harness/src/engine/conversation.ts (originate migration)"
+      - "apps/harness/test/flow.test.ts (extend)"
+    technical_notes: "Keep it small: loadPhaseBrief resolves ONLY inside the trusted bundled roots; reuse the SDK's frontmatter parsing if exported, else a tiny splitter. Do NOT remove skillsOverride narrowing - it still prevents user-project skill leakage into phase sessions. Live behavior is expected unchanged-or-better (the L0.5 dogfood showed the model reading SKILL.md as an extra turn-1 step; injection removes that step)."
+    verification:
+      unit: ["brief body present in assembled prompt", "frontmatter stripped", "missing-brief boot error"]
+      integration: ["originate cockpit session carries the body directly (scripted double)"]
+      contract: []
+
   - id: SIBYL-016
     title: "Cockpit envision integration - detect-state routing, live framing render, journey 02"
     layer: 1
@@ -904,7 +946,7 @@ stories:
     capability: guided-aep-journey-tui
     calibration_type: null
     object_model_refs: []
-    slice: 3
+    slice: 4
     status: pending
     readiness_score: 0.85
     assigned_to: null
@@ -914,7 +956,7 @@ stories:
     complexity: M
     compile_mode: single_change
     change_group: null
-    dependencies: ["SIBYL-013", "SIBYL-014", "SIBYL-015"]
+    dependencies: ["SIBYL-013", "SIBYL-014", "SIBYL-015", "SIBYL-017"]
     description:
       what_changes: "Wire the kernel into the cockpit: on boot, detectPhase(cwd) chooses the conversation's phase session (README committed + no product/index.yaml -> envision; else originate as today). The Architecture tab renders product/index.yaml live once submit_envision lands (YAML -> readable outline; re-render on artifact_changed, same mechanism as the Goal/README tab). Envision completion is captured as a decision (existing sink). Authors skills/e2e-test/journeys/02-cockpit-envision.md: scenario 02.1 zero-quota render smoke (envision phase boots, tabs render) + 02.2 live guided envision (vague README -> interview -> schema-valid committed product/index.yaml) - 02.2 EXECUTION deferred to the L2 milestone gate per dogfood live_policy."
       why: "Closes L1's user_can: drive envision through the SDK from the originate README, observed live in the cockpit. Detect-state routing surfaces the kernel's determinism to the user (resume at the right step)."
@@ -969,6 +1011,10 @@ waves:
     theme: "Typed envision completion + sibyl-envision bundled skill"
   - layer: 1
     wave: 3
+    stories: ["SIBYL-017"]
+    theme: "Deterministic brief injection (compiled prompts replace runtime skill discovery)"
+  - layer: 1
+    wave: 4
     stories: ["SIBYL-016"]
     theme: "Cockpit envision integration (detect-state routing + live render + journey 02)"
 
@@ -1127,9 +1173,9 @@ layer_gates:
       - skills/e2e-test/journeys/01-cockpit-guided-originate.md # regression (zero-quota render half)
       - skills/e2e-test/journeys/02-cockpit-envision.md # authored by SIBYL-016; 02.1 render smoke runs at THIS gate, 02.2 LIVE half deferred to the L2 milestone gate (dogfood live_policy: milestone_gates_only)
     coverage:
-      criteria_total: 13
-      criteria_covered: 0
-      uncovered: ["all - layer not started"]
+      criteria_total: 16 # 013(4) + 014(3) + 015(3) + 016(3) + 017(3)
+      criteria_covered: 4 # SIBYL-013 merged
+      uncovered: ["SIBYL-014/015 in progress", "SIBYL-016/017 pending"]
     evidence:
       scripted: null
       journeys: []
@@ -1469,3 +1515,9 @@ changelog:
     author: agent
     summary: "Dispatch epoch 11 (L1 wave 2, parallel): SIBYL-014 (submit_envision typed completion) -> feat/sibyl-014-submit-envision and SIBYL-015 (sibyl-envision bundled skill) -> feat/sibyl-015-envision-skill; no files_affected overlap, both to worktree subagents."
     sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: calibration
+    author: human + agent
+    summary: "scope-direction refinement #2 (user): reviewed the AEP skills' design - they interleave PROCEDURE (prose state machines, e.g. aep-build's 13 phases) with JUDGMENT (interviews/heuristics); instability comes from the model executing the procedure. Decision (docs/decisions/aep-conduct-mechanisms.md): procedure -> TypeScript kernel; judgment -> prompt-COMPILED briefs injected via appendSystemPrompt (md files stay as the authoring format; runtime skill discovery never load-bearing, skillsOverride kept as leak defense); determinism ladder (brief -> typed completion -> steer nudges -> scripted micro-turns). Story workers (L4/L6) = independent OS processes, tmux/claude-bg style, cockpit can ATTACH + steer - SIBYL implements its own Pi-native executor rather than AEP's host-CLI backend matrix. New SIBYL-017 (brief injection) inserted as L1 wave 3; SIBYL-016 -> wave 4, now depends on 017. In-flight review: SIBYL-014 unaffected (it IS ladder rung 2); SIBYL-015 steered mid-flight to write the body in injected-brief voice."
+    sections_changed: ["architecture", "stories", "waves", "layer_gates"]
