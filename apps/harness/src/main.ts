@@ -678,15 +678,24 @@ function formatDecisions(decisions: readonly DecisionEntry[]): string | undefine
 
 /**
  * Read an artifact's current text for the cockpit: the Goal is `README.md` on
- * disk; the Decisions tab formats the `decisions` the mount layer accumulates from
- * `decision_captured` events (the conversation owns its own in-memory session, so
- * the mount layer never sees its SessionManager directly).
+ * disk; the Architecture tab is the envision output `product/index.yaml` on disk
+ * (SIBYL-016 — absent until `submit_envision` completes, so the tab shows its
+ * empty state); the Decisions tab formats the `decisions` the mount layer
+ * accumulates from `decision_captured` events (the conversation owns its own
+ * in-memory session, so the mount layer never sees its SessionManager directly).
  */
 function cockpitArtifactReader(cwd: string, decisions: readonly DecisionEntry[]): ReadArtifact {
   return (tab) => {
     if (tab === "goal") {
       try {
         return readFileSync(join(cwd, "README.md"), "utf8");
+      } catch {
+        return undefined;
+      }
+    }
+    if (tab === "architecture") {
+      try {
+        return readFileSync(join(cwd, "product", "index.yaml"), "utf8");
       } catch {
         return undefined;
       }
