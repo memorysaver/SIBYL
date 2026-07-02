@@ -947,7 +947,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 4
-    status: in_progress
+    status: completed
     readiness_score: 0.85
     assigned_to: "feat/sibyl-016-cockpit-envision"
     openspec_change: "SIBYL-016"
@@ -1167,21 +1167,29 @@ layer_gates:
     completed_at: 2026-07-02
 
   - layer: 1
-    status: pending
+    status: passed # 2026-07-02, judged under full_auto; live 02.2 rides the L2 milestone gate
     test_definition: "In a repo whose README was committed by originate (and no product/index.yaml), `sibyl cockpit` deterministically enters the ENVISION phase (detect-state routing); the phase session carries ONLY the sibyl-envision skill + gated tools; a guided interview turns the README into a schema-valid product/index.yaml written + committed BY THE HARNESS via submit_envision (never free-written by the model); the Architecture tab re-renders the framing live; the guard provably blocks out-of-allowlist writes."
     journeys:
       - skills/e2e-test/journeys/01-cockpit-guided-originate.md # regression (zero-quota render half)
       - skills/e2e-test/journeys/02-cockpit-envision.md # authored by SIBYL-016; 02.1 render smoke runs at THIS gate, 02.2 LIVE half deferred to the L2 milestone gate (dogfood live_policy: milestone_gates_only)
     coverage:
       criteria_total: 16 # 013(4) + 014(3) + 015(3) + 016(3) + 017(3)
-      criteria_covered: 4 # SIBYL-013 merged
-      uncovered: ["SIBYL-014/015 in progress", "SIBYL-016/017 pending"]
+      criteria_covered: 16
+      uncovered: []
     evidence:
-      scripted: null
-      journeys: []
+      scripted: "All 4 L1 merges green on main (be97c74, 9d2741c, 459b1e4, 4aa668e, 7bfb629): 178 tests / 20 files, tsc clean, ADR-001 renderer scan green. +78 tests over L0.5."
+      journeys:
+        - "journey 02.1 (zero-quota envision render smoke, live via shell-use, run by the SIBYL-016 build agent): temp repo w/ committed README -> [envision] header, 4 tabs, Architecture empty-state, 8/8 expect-text, no prompt submitted, git log unchanged."
+        - "journey 01 regression (zero-quota originate render half, live via shell-use, run by the orchestrator at the gate): EMPTY repo -> [originate], 4 tabs, ready, 6/6 assertions, zero commits after."
+        - "beyond-registry fallback observed live (incidental): cockpit on the SIBYL repo itself (both artifacts present) rendered [envision] + fallback note instead of crashing."
+        - "journey 02.2 (LIVE guided envision) DEFERRED by dogfood.live_policy to the L2 milestone gate - authored, not executed."
       matrix: docs/layer-gates/1.md
-    results: null
-    completed_at: null
+    results:
+      tests_run: 178
+      tests_passed: 178
+      tests_failed: 0
+      failures: []
+    completed_at: 2026-07-02
 
 # ─── COST ────────────────────────────────────────────────────────
 cost:
@@ -1557,3 +1565,15 @@ changelog:
     author: agent
     summary: "Dispatch epoch 13 (L1 wave 4, final): SIBYL-016 (cockpit envision integration + journey 02) -> feat/sibyl-016-cockpit-envision."
     sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: story_completed
+    author: agent
+    summary: "SIBYL-016 (cockpit envision integration) merged @7bfb629: resolveCockpitPhase (kernel detectPhase at conversation construction; beyond-registry throw caught -> envision fallback + note), bootCockpitSession -> bootPhaseSession (originate prompt byte-identical), new phase ConversationEvent, PhaseCompletionHooks wired to decision sink + artifact_changed{architecture}; Architecture tab = parse-and-outline of product/index.yaml (yaml pkg) with empty-state; journey 02 authored + 02.1 PASSED live zero-quota. 178 tests (+14), tsc clean. Deviation accepted: 9-line additive main.ts artifact-reader branch."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: layer_gate
+    author: agent
+    summary: "LAYER 1 GATE PASSED (full_auto judgment): 16/16 criteria across 5 stories; Tier-1 178 tests green; Tier-2 zero-quota journeys live via shell-use (02.1 envision smoke + 01 originate regression + incidental beyond-registry fallback proof). Journey 02.2 live half deferred by policy to the L2 milestone gate. Evidence: docs/layer-gates/1.md. L1 = the vertical proof of the SIBYL Phase Pattern; advance to L2 (Story-map + routing / legibility)."
+    sections_changed: ["layer_gates"]
