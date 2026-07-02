@@ -13,6 +13,7 @@ How to run a journey is in the **execution protocol** of [`../SKILL.md`](../SKIL
 | -- | -------------------------------------------- | --------------------------- |
 | 00 | [Walking skeleton](00-walking-skeleton.md)   | Layer 0 — MVP contract path (headless `cli` originate, scripted model) |
 | 01 | [Cockpit: guided originate](01-cockpit-guided-originate.md) | Layer 0 — the cockpit (`tui`, live model): guided Q&A → focused committed README + captured decision (SIBYL-009/010/011) |
+| 02 | [Cockpit: guided envision](02-cockpit-envision.md) | Layer 1 — detect-state boot into envision (`tui`; 02.1 zero-quota at the L1 gate, 02.2 live at the L2 gate): interview → typed `submit_envision` → committed `product/index.yaml` on the Architecture tab (SIBYL-013/014/015/017/016) |
 | .. | _add a row per journey as the product grows_ | _layer N / criterion ids_   |
 
 ## Journey doc template

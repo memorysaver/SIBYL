@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,14 +7,17 @@ import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-
 import { describe, expect, it } from "vitest";
 
 import {
+  COCKPIT_BEYOND_REGISTRY_NOTE,
   COCKPIT_ORIGINATE_POINTER,
   COCKPIT_TOOLS,
   type ConversationEvent,
   type ConversationSession,
+  createCockpitCompletionHooks,
   createConversation,
   defaultConversationConnect,
+  resolveCockpitPhase,
 } from "../src/engine/conversation";
-import { loadPhaseBrief } from "../src/engine/flow";
+import { getPhaseSpec, loadPhaseBrief } from "../src/engine/flow";
 import type { DecisionEntry } from "../src/memory/decisions";
 
 /**
@@ -344,5 +347,246 @@ describe("originate cockpit brief injection (SIBYL-017)", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ─── SIBYL-016: detect-state routing in the cockpit ──────────────────────────
+
+/** A temp git repo shaped as one of the three artifact states the cockpit routes on. */
+async function makePhaseRepo(shape: "empty" | "readme-committed" | "beyond"): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "sibyl-conv-phase-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  if (shape !== "empty") {
+    await writeFile(join(dir, "README.md"), "# Goal\n\nA committed, focused goal.\n");
+    execFileSync("git", ["add", "README.md"], { cwd: dir });
+    execFileSync(
+      "git",
+      ["-c", "user.email=sibyl@test", "-c", "user.name=SIBYL", "commit", "-q", "-m", "docs: add README"],
+      { cwd: dir },
+    );
+  }
+  if (shape === "beyond") {
+    await mkdir(join(dir, "product"), { recursive: true });
+    await writeFile(join(dir, "product", "index.yaml"), "product: {}\n");
+  }
+  return dir;
+}
+
+describe("cockpit detect-state routing (SIBYL-016)", () => {
+  it("resolveCockpitPhase routes by the committed artifacts, without a note", async () => {
+    const empty = await makePhaseRepo("empty");
+    const envision = await makePhaseRepo("readme-committed");
+    try {
+      expect(resolveCockpitPhase(empty)).toEqual({ spec: getPhaseSpec("originate") });
+      expect(resolveCockpitPhase(envision)).toEqual({ spec: getPhaseSpec("envision") });
+    } finally {
+      await rm(empty, { recursive: true, force: true });
+      await rm(envision, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to envision WITH the status note when the artifacts are beyond the registry", async () => {
+    const dir = await makePhaseRepo("beyond");
+    try {
+      // detectPhase THROWS here — the cockpit resolution must not.
+      const phase = resolveCockpitPhase(dir);
+      expect(phase.spec.id).toBe("envision");
+      expect(phase.note).toBe(COCKPIT_BEYOND_REGISTRY_NOTE);
+      expect(phase.note).toMatch(/L2/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("replays the resolved phase to a subscriber before any send — no connect, no model", async () => {
+    const dir = await makePhaseRepo("beyond");
+    try {
+      let connects = 0;
+      const conversation = createConversation({
+        cwd: dir,
+        connect: async () => {
+          connects += 1;
+          throw new Error("must not connect for a phase replay");
+        },
+      });
+      const events: ConversationEvent[] = [];
+      conversation.subscribe((event) => events.push(event));
+      await Promise.resolve(); // flush the deferred replay
+      expect(events).toEqual([
+        { type: "phase", phase: "envision", note: COCKPIT_BEYOND_REGISTRY_NOTE },
+      ]);
+      expect(connects).toBe(0); // lazy connect untouched: zero-quota render smokes stay free
+      await conversation.dispose();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("gates the session's tools to the ENVISION allowlist when the README is committed", async () => {
+    const dir = await makePhaseRepo("readme-committed");
+    try {
+      const fake = new FakeAgentSession(runScript);
+      const conversation = createConversation({ cwd: dir, connect: async () => fake });
+      await conversation.dispatch({ type: "send", text: "frame the product" });
+      expect([...fake.activeTools].sort()).toEqual(["find", "grep", "ls", "read", "submit_envision"]);
+      await conversation.dispose();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("AC1: the default connect boots the ENVISION phase session for a committed README", async () => {
+    const dir = await makePhaseRepo("readme-committed");
+    try {
+      const session = await defaultConversationConnect(dir, new AbortController().signal);
+      try {
+        const agentSession = session as AgentSession;
+        const prompt = agentSession.systemPrompt;
+
+        // The sibyl-envision role line + FULL compiled brief body are injected…
+        expect(prompt).toContain(getPhaseSpec("envision").promptBrief);
+        expect(prompt).toContain(loadPhaseBrief("sibyl-envision"));
+        expect(prompt).toContain("Complete ONLY by calling `submit_envision`");
+
+        // …and the originate shape is NOT: neither its role line nor its brief body.
+        expect(prompt).not.toContain(COCKPIT_ORIGINATE_POINTER);
+        expect(prompt).not.toContain("you run git, never the user");
+
+        // Active tools are the read-only set PLUS the typed completion tool.
+        expect([...agentSession.getActiveToolNames()].sort()).toEqual([
+          "find",
+          "grep",
+          "ls",
+          "read",
+          "submit_envision",
+        ]);
+      } finally {
+        await session.dispose();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("the beyond-registry fallback still BOOTS (envision session, cockpit does not crash)", async () => {
+    const dir = await makePhaseRepo("beyond");
+    try {
+      const session = await defaultConversationConnect(dir, new AbortController().signal);
+      try {
+        const agentSession = session as AgentSession;
+        expect(agentSession.systemPrompt).toContain("Complete ONLY by calling `submit_envision`");
+        expect([...agentSession.getActiveToolNames()]).toContain("submit_envision");
+      } finally {
+        await session.dispose();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── SIBYL-016: submit_envision completion surfaces on the tabs ──────────────
+
+describe("cockpit completion hooks + submit_envision surfacing (SIBYL-016)", () => {
+  it("createCockpitCompletionHooks routes the decision through the SIBYL-011 capture path", () => {
+    const captured: DecisionEntry[] = [];
+    const emitted: ConversationEvent[] = [];
+    const now = (): number => 1_719_000_000_000;
+    const hooks = createCockpitCompletionHooks({
+      capture: (entry) => captured.push(entry),
+      emit: (event) => emitted.push(event),
+      now,
+    });
+
+    // The submit tool's clock is the conversation's injectable one.
+    expect(hooks.now).toBe(now);
+
+    const entry: DecisionEntry = {
+      id: "envision-1719000000000",
+      phase: "envision",
+      decision: "Committed product/index.yaml (envision framing)",
+      at: 1_719_000_000_000,
+    };
+    hooks.onPhaseCompleted?.("envision", {});
+    hooks.decisionSink?.(entry);
+
+    expect(captured).toEqual([entry]);
+    expect(emitted).toEqual([
+      { type: "artifact_changed", tab: "architecture" }, // the framing tab re-renders…
+      { type: "decision_captured", entry }, // …and the decision is surfaced…
+      { type: "artifact_changed", tab: "decisions" }, // …on the Decisions tab too.
+    ]);
+  });
+
+  it("a successful submit_envision tool end invalidates the Architecture tab", async () => {
+    const script = (): AgentSessionEvent[] => {
+      const message = assistantMessage("");
+      return [
+        { type: "agent_start" },
+        {
+          type: "tool_execution_start",
+          toolCallId: "s1",
+          toolName: "submit_envision",
+          args: { problem: "…" },
+        },
+        {
+          type: "tool_execution_end",
+          toolCallId: "s1",
+          toolName: "submit_envision",
+          result: {},
+          isError: false,
+        },
+        { type: "agent_end", messages: [message], willRetry: false },
+      ];
+    };
+    const fake = new FakeAgentSession(script);
+    const conversation = createConversation({ cwd: "/tmp/ignored", connect: async () => fake });
+    const events: ConversationEvent[] = [];
+    conversation.subscribe((event) => events.push(event));
+
+    await conversation.dispatch({ type: "send", text: "submit the framing" });
+
+    expect(
+      events.some((e) => e.type === "artifact_changed" && e.tab === "architecture"),
+    ).toBe(true);
+    // The tool round-trip itself surfaces in chat like any other tool.
+    expect(
+      events.some((e) => e.type === "tool" && e.name === "submit_envision" && e.phase === "end"),
+    ).toBe(true);
+    await conversation.dispose();
+  });
+
+  it("a FAILED submit_envision does not invalidate the Architecture tab", async () => {
+    const script = (): AgentSessionEvent[] => {
+      const message = assistantMessage("");
+      return [
+        { type: "agent_start" },
+        {
+          type: "tool_execution_start",
+          toolCallId: "s1",
+          toolName: "submit_envision",
+          args: { problem: "" },
+        },
+        {
+          type: "tool_execution_end",
+          toolCallId: "s1",
+          toolName: "submit_envision",
+          result: {},
+          isError: true,
+        },
+        { type: "agent_end", messages: [message], willRetry: false },
+      ];
+    };
+    const fake = new FakeAgentSession(script);
+    const conversation = createConversation({ cwd: "/tmp/ignored", connect: async () => fake });
+    const events: ConversationEvent[] = [];
+    conversation.subscribe((event) => events.push(event));
+
+    await conversation.dispatch({ type: "send", text: "submit the framing" });
+
+    expect(
+      events.some((e) => e.type === "artifact_changed" && e.tab === "architecture"),
+    ).toBe(false);
+    await conversation.dispose();
   });
 });

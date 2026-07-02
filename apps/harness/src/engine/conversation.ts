@@ -8,12 +8,20 @@
  * {@link ConversationCommand} — never the SDK — mirroring ADR-001.
  *
  * {@link createConversation} boots a real Codex-backed `AgentSession` (via
- * {@link bootSession}, using the user's existing `~/.pi/agent` login + default
- * model), gates its tools, injects a guided system prompt, and translates the Pi
- * `AgentSessionEvent` stream into the small {@link ConversationEvent} union the
- * cockpit renders. A scripted session double satisfies the same
- * {@link ConversationSession} port, so the mapping is unit-testable with NO live
- * model.
+ * {@link bootPhaseSession}, using the user's existing `~/.pi/agent` login +
+ * default model) FOR THE PHASE THE PROJECT'S ARTIFACTS ARE IN (SIBYL-016): the
+ * cockpit routes through the AEP kernel's `detectPhase` over a real fs/git
+ * probe, so a repo with no committed README boots the originate session and a
+ * repo with a committed README (but no `product/index.yaml`) boots the ENVISION
+ * session — envision brief compiled in, `submit_envision` registered, guard on.
+ * Beyond-registry artifact states (post-envision phases arrive at L2) fall back
+ * to envision with a status note rather than crashing the cockpit.
+ *
+ * The booted session's tools are gated to the phase's allowlist, and the Pi
+ * `AgentSessionEvent` stream is translated into the small
+ * {@link ConversationEvent} union the cockpit renders. A scripted session double
+ * satisfies the same {@link ConversationSession} port, so the mapping is
+ * unit-testable with NO live model.
  */
 
 import type {
@@ -23,8 +31,16 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import { createSibylEngineExtension } from "./extension";
-import { COCKPIT_ORIGINATE_POINTER, COCKPIT_TOOLS, loadPhaseBrief } from "./flow";
-import { bootSession } from "./session";
+import {
+  COCKPIT_ORIGINATE_POINTER,
+  COCKPIT_TOOLS,
+  bootPhaseSession,
+  createFsArtifactProbe,
+  detectPhase,
+  getPhaseSpec,
+  type PhaseSpec,
+} from "./flow";
+import { SUBMIT_ENVISION_TOOL_NAME, type PhaseCompletionHooks } from "./submit";
 import { appendDecision, type DecisionEntry } from "../memory/decisions";
 import { registerGitTool } from "../tools/git";
 
@@ -42,6 +58,17 @@ export type ArtifactTab = "goal" | "story-map" | "architecture" | "decisions";
 
 /** Events the conversation streams to the cockpit. Discriminated on `type`. */
 export type ConversationEvent =
+  | {
+      /**
+       * The AEP phase this cockpit conversation is conducting (SIBYL-016).
+       * Replayed to every subscriber on subscribe — detection is a pure
+       * artifact read, so it costs no model call and arrives before any send.
+       * `note` carries the beyond-registry fallback explanation, when any.
+       */
+      readonly type: "phase";
+      readonly phase: string;
+      readonly note?: string;
+    }
   | { readonly type: "user_echo"; readonly text: string }
   | { readonly type: "assistant_delta"; readonly text: string }
   | { readonly type: "assistant_done" }
@@ -90,10 +117,49 @@ export interface Conversation {
 }
 
 // ---------------------------------------------------------------------------
+// Detect-state phase routing (SIBYL-016).
+// ---------------------------------------------------------------------------
+
+/** The cockpit's resolved AEP phase: the registry spec + an optional status note. */
+export interface CockpitPhase {
+  /** The phase registry entry the cockpit session boots with. */
+  readonly spec: PhaseSpec;
+  /** A human-readable status note (set only on the beyond-registry fallback). */
+  readonly note?: string;
+}
+
+/**
+ * The status note surfaced when the project's artifacts are beyond every
+ * registered phase (committed README AND `product/index.yaml` both present):
+ * `detectPhase` THROWS there by design, and for L1 the cockpit falls back to
+ * the envision phase instead of crashing (post-envision phases arrive at L2).
+ */
+export const COCKPIT_BEYOND_REGISTRY_NOTE =
+  "Project artifacts are beyond the registered phases (README.md and product/index.yaml are both " +
+  "present) — falling back to the envision phase. Post-envision phases arrive at L2.";
+
+/**
+ * Route the cockpit to its AEP phase from the project's artifacts alone
+ * (detect-state routing, SIBYL-016): `detectPhase` over the real fs/git probe,
+ * per the ratified Phase Pattern. When the artifacts are beyond the registry
+ * (`detectPhase` throws), the cockpit must not crash — it falls back to the
+ * LAST registered phase (envision) and carries {@link COCKPIT_BEYOND_REGISTRY_NOTE}
+ * so the UI can say why.
+ */
+export function resolveCockpitPhase(cwd: string): CockpitPhase {
+  const probe = createFsArtifactProbe(cwd);
+  try {
+    return { spec: getPhaseSpec(detectPhase(probe)) };
+  } catch {
+    return { spec: getPhaseSpec("envision"), note: COCKPIT_BEYOND_REGISTRY_NOTE };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tool gating + compiled originate brief.
 // ---------------------------------------------------------------------------
 
-/** The run phase decisions captured in the cockpit are recorded under (mirrors main.ts). */
+/** The run phase a cockpit git-commit decision is recorded under (SIBYL-011). */
 const COCKPIT_PHASE = "originate";
 
 /** Tool names whose completion likely changed an on-disk artifact (→ re-read). */
@@ -168,24 +234,60 @@ function describeCommit(args: readonly string[]): string {
 /** Sink for a decision the agent makes mid-conversation (default: persist via `appendDecision`). */
 export type DecisionSink = (entry: DecisionEntry) => void;
 
+/**
+ * Wire a phase's {@link PhaseCompletionHooks} into the conversation seam
+ * (SIBYL-016): when the phase's typed submit tool (e.g. `submit_envision`)
+ * completes, route the completion decision through the EXISTING SIBYL-011
+ * decision-capture path — persist via `capture`, surface a `decision_captured`
+ * event, and invalidate the Decisions tab — and re-render the Architecture tab
+ * (`artifact_changed`) so the freshly committed `product/index.yaml` shows up
+ * without a restart. Exported as a pure factory so the wiring is unit-testable
+ * without a live model.
+ */
+export function createCockpitCompletionHooks(deps: {
+  /** Persist the completion {@link DecisionEntry} (default sink: `appendDecision`). */
+  capture: DecisionSink;
+  /** Emit a {@link ConversationEvent} to the cockpit. */
+  emit: (event: ConversationEvent) => void;
+  /** Timestamp source threaded into the submit tool (deterministic in tests). */
+  now?: () => number;
+}): PhaseCompletionHooks {
+  return {
+    ...(deps.now ? { now: deps.now } : {}),
+    onPhaseCompleted: () => {
+      deps.emit({ type: "artifact_changed", tab: "architecture" });
+    },
+    decisionSink: (entry) => {
+      deps.capture(entry);
+      deps.emit({ type: "decision_captured", entry });
+      deps.emit({ type: "artifact_changed", tab: "decisions" });
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The live default connect: a real Codex-backed session.
 // ---------------------------------------------------------------------------
 
 /**
- * Boot a real Codex-backed cockpit session: the SIBYL engine-extension + the
- * narrow git tool bound, and the guided-originate flow COMPILED into the system
- * prompt (SIBYL-017) — the one-line {@link COCKPIT_ORIGINATE_POINTER} role line
- * followed by the full `sibyl-originate` SKILL.md body via {@link loadPhaseBrief}.
- * The skill file stays the authoring unit, but the model never has to notice or
- * read it: injection, not discovery, delivers the flow. Auth + model come from
- * the user's `~/.pi/agent` config. `onPi`, when supplied, receives the session's
- * real `ExtensionAPI` so the default decision sink can persist commits via
- * `appendDecision` (the same pi-capture trick `main.ts` uses).
+ * Boot a real Codex-backed cockpit session FOR ONE AEP PHASE via the kernel's
+ * {@link bootPhaseSession} (SIBYL-016): SIBYL_PERSONA → the phase role line →
+ * the phase's COMPILED SKILL.md body (SIBYL-017), skills narrowed to exactly
+ * the phase skill, tools narrowed to the phase allowlist, the invariant guard
+ * bound, and — when the registry entry declares one — the phase's typed
+ * completion tool (e.g. `submit_envision`) registered with the caller's
+ * `completion` hooks. The skill file stays the authoring unit, but the model
+ * never has to notice or read it: injection, not discovery, delivers the flow.
+ * Auth + model come from the user's `~/.pi/agent` config. `onPi`, when
+ * supplied, receives the session's real `ExtensionAPI` so the default decision
+ * sink can persist via `appendDecision` (the same pi-capture trick `main.ts`
+ * uses).
  */
 async function bootCockpitSession(
   cwd: string,
+  phase: CockpitPhase,
   onPi?: (pi: ExtensionAPI) => void,
+  completion?: PhaseCompletionHooks,
 ): Promise<ConversationSession> {
   const extensionFactories: ExtensionFactory[] = [
     createSibylEngineExtension(),
@@ -196,22 +298,25 @@ async function bootCockpitSession(
       onPi(pi);
     });
   }
-  const { session } = await bootSession(cwd, {
+  const { session } = await bootPhaseSession(phase.spec, {
+    cwd,
     extensionFactories,
-    // SIBYL_PERSONA (prepended by bootSession) → role line → compiled brief body.
-    appendSystemPrompt: [COCKPIT_ORIGINATE_POINTER, loadPhaseBrief("sibyl-originate")],
+    ...(completion ? { completion } : {}),
   });
   return session;
 }
 
 /**
- * The production connector: boots a real Pi `AgentSession` via {@link bootSession}
- * with the git tool bound and the guided-originate brief compiled into the system
- * prompt (role line + full `sibyl-originate` body — see {@link bootCockpitSession}).
- * Auth + model come from the user's `~/.pi/agent` config (the `openai-codex`
- * login + `defaultModel`). Requires no login step when already authenticated.
+ * The production connector: detect-state routes the project (`README.md`
+ * committed? `product/index.yaml` present?) and boots the matching phase
+ * session — originate exactly as before SIBYL-016; envision (brief +
+ * `submit_envision` + guard) for a committed README — via
+ * {@link bootCockpitSession}. Auth + model come from the user's `~/.pi/agent`
+ * config (the `openai-codex` login + `defaultModel`). Requires no login step
+ * when already authenticated.
  */
-export const defaultConversationConnect: ConversationConnect = (cwd) => bootCockpitSession(cwd);
+export const defaultConversationConnect: ConversationConnect = (cwd) =>
+  bootCockpitSession(cwd, resolveCockpitPhase(cwd));
 
 // ---------------------------------------------------------------------------
 // The adapter: Pi AgentSessionEvent -> ConversationEvent.
@@ -241,6 +346,12 @@ class ConversationImpl implements Conversation {
   readonly #now: () => number;
   readonly #listeners = new Set<(event: ConversationEvent) => void>();
   readonly #abort = new AbortController();
+  /**
+   * The AEP phase this conversation conducts, detect-state routed from the
+   * project's artifacts at construction (SIBYL-016). A pure fs/git read — no
+   * session, no model call — so the lazy-connect contract is untouched.
+   */
+  readonly #phase: CockpitPhase;
 
   #session: ConversationSession | undefined;
   #connecting: Promise<ConversationSession> | undefined;
@@ -256,14 +367,21 @@ class ConversationImpl implements Conversation {
   constructor(options: CreateConversationOptions) {
     this.#cwd = options.cwd;
     this.#now = options.now ?? Date.now;
+    this.#phase = resolveCockpitPhase(options.cwd);
     // Default connect captures `pi` into this instance so the default sink can
-    // persist commits through the genuine `pi.appendEntry` path.
+    // persist commits through the genuine `pi.appendEntry` path, and threads the
+    // phase's completion hooks so a typed submit surfaces on the tabs.
     this.#connect =
       options.connect ??
       ((cwd) =>
-        bootCockpitSession(cwd, (pi) => {
-          this.#capturedPi = pi;
-        }));
+        bootCockpitSession(
+          cwd,
+          this.#phase,
+          (pi) => {
+            this.#capturedPi = pi;
+          },
+          this.#completionHooks(),
+        ));
     this.#captureDecision =
       options.captureDecision ??
       ((entry) => {
@@ -275,9 +393,43 @@ class ConversationImpl implements Conversation {
 
   subscribe(listener: (event: ConversationEvent) => void): () => void {
     this.#listeners.add(listener);
+    // Replay the resolved phase to the new subscriber (deferred so a subscriber
+    // is never re-entered while its own `subscribe` call is still on the stack).
+    // This is how the cockpit learns the phase before any send — free of model
+    // cost, so zero-quota render smokes still see it.
+    queueMicrotask(() => {
+      if (this.#listeners.has(listener)) {
+        const note = this.#phase.note;
+        listener({
+          type: "phase",
+          phase: this.#phase.spec.id,
+          ...(note !== undefined ? { note } : {}),
+        });
+      }
+    });
     return () => {
       this.#listeners.delete(listener);
     };
+  }
+
+  /**
+   * The phase's completion hooks (only for phases declaring a typed completion
+   * tool): persist the decision through this conversation's sink and surface
+   * `decision_captured` + `artifact_changed` events (SIBYL-016).
+   */
+  #completionHooks(): PhaseCompletionHooks | undefined {
+    if (!this.#phase.spec.completionToolFactory) {
+      return undefined;
+    }
+    return createCockpitCompletionHooks({
+      capture: (entry) => {
+        this.#captureDecision(entry);
+      },
+      emit: (event) => {
+        this.#emit(event);
+      },
+      now: this.#now,
+    });
   }
 
   async dispatch(command: ConversationCommand): Promise<void> {
@@ -329,7 +481,9 @@ class ConversationImpl implements Conversation {
         this.#unsubscribeSession = session.subscribe((event) => {
           this.#onAgentEvent(event);
         });
-        session.setActiveToolsByName([...COCKPIT_TOOLS]);
+        // Gate tools to the DETECTED phase's allowlist (SIBYL-016): the cockpit
+        // set for originate, read-only + `submit_envision` for envision.
+        session.setActiveToolsByName([...this.#phase.spec.toolAllowlist]);
         this.#session = session;
         return session;
       })();
@@ -383,6 +537,12 @@ class ConversationImpl implements Conversation {
         }
         if (isArtifactWritingTool(event.toolName)) {
           this.#emit({ type: "artifact_changed", tab: "goal" });
+        }
+        // A successful `submit_envision` means the harness just wrote+committed
+        // `product/index.yaml` — invalidate the Architecture tab (SIBYL-016).
+        // (The decision itself is captured by the completion hooks, not here.)
+        if (event.toolName === SUBMIT_ENVISION_TOOL_NAME && event.isError !== true) {
+          this.#emit({ type: "artifact_changed", tab: "architecture" });
         }
         break;
       }
