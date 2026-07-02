@@ -227,14 +227,14 @@ describe("bootPhaseSession (AC2) — one skill, exact tools", () => {
     }
   });
 
-  it("envision session: no skill leak (its SKILL.md arrives in SIBYL-015), read-only tools", async () => {
+  it("envision session: only sibyl-envision, no skill leak, read-only tools", async () => {
     const spec = getPhaseSpec("envision");
     const { session, loader } = await bootPhaseSession(spec, { cwd: userProject });
 
     try {
-      // The sibyl-envision SKILL.md ships in SIBYL-015; until then the narrowed
-      // set is EMPTY — never the decoy, never another phase's skill.
-      expect(loader.getSkills().skills).toEqual([]);
+      // The sibyl-envision SKILL.md ships with SIBYL-015: the narrowed set is
+      // EXACTLY the phase skill — never the decoy, never another phase's skill.
+      expect(loader.getSkills().skills.map((skill) => skill.name)).toEqual(["sibyl-envision"]);
       const prompt = session.systemPrompt;
       expect(prompt).not.toContain("user-decoy");
       expect(prompt).not.toContain("sibyl-originate");
