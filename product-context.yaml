@@ -1527,3 +1527,9 @@ changelog:
     author: agent
     summary: "SIBYL-015 (sibyl-envision bundled skill) merged @9d2741c: 73-line conductor brief in INJECTED-BRIEF voice (mid-flight steer applied - no self-referential skill framing), 139 tests green (+4: cwd-independent discovery, prompt surfacing, envision-session narrows to EXACTLY sibyl-envision incl. a planted user-decoy skill excluded, content invariants incl. complete-ONLY-via-submit_envision). SIBYL-014 still in flight."
     sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: calibration
+    author: human + agent
+    summary: "PATTERN RATIFIED (user): the SIBYL Phase Pattern is THE repeating template for every AEP phase - one PhaseSpec registry entry (entryCondition/brief/allowlists/typed submit), 5 invariants (fresh session, injected brief, guard on, no free-writes, harness-owned lifecycle), exactly 3 variation axes (ladder rung, session locality, artifact target). Formalized in docs/decisions/sibyl-phase-pattern.md; later story specs MUST reference it instead of re-deriving design. L1 = vertical proof for envision; L2-L6 become mostly instantiation."
+    sections_changed: ["architecture"]
