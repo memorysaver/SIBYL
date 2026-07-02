@@ -22,6 +22,7 @@ import {
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { parse as parseYaml } from "yaml";
 
 import type { ArtifactTab, ConversationCommand, ConversationEvent } from "../engine/conversation";
 import { padTo, Panel } from "./panel";
@@ -33,7 +34,7 @@ export interface CockpitTab {
   readonly label: string;
 }
 
-/** The fixed tab set (framework complete; only Goal is wired to real content in v1). */
+/** The fixed tab set (Goal, Architecture and Decisions render real artifacts; Story Map is L2+). */
 export const COCKPIT_TABS: readonly CockpitTab[] = [
   { id: "goal", label: "Goal" },
   { id: "story-map", label: "Story Map" },
@@ -42,15 +43,21 @@ export const COCKPIT_TABS: readonly CockpitTab[] = [
 ];
 
 /** Placeholder copy for the not-yet-wired tabs. */
-const TAB_PLACEHOLDER: Record<Exclude<ArtifactTab, "goal">, string> = {
+const TAB_PLACEHOLDER: Record<Exclude<ArtifactTab, "goal" | "architecture">, string> = {
   "story-map": "Story Map — the AEP story graph / object map will render here.",
-  architecture: "Architecture — the system map from product-context.yaml will render here.",
   decisions: "Decisions — the decision-memory log will render here.",
 };
 
-/** A chat entry in arrival order (interleaves user / assistant / tool / error). */
+/**
+ * The Architecture tab's empty state (SIBYL-016): shown until the envision
+ * phase completes and the harness writes `product/index.yaml`.
+ */
+export const ARCHITECTURE_EMPTY_STATE =
+  "No product/index.yaml yet — complete the envision phase to frame the product.";
+
+/** A chat entry in arrival order (interleaves user / assistant / tool / info / error). */
 interface ChatEntry {
-  kind: "user" | "assistant" | "tool" | "error";
+  kind: "user" | "assistant" | "tool" | "info" | "error";
   text: string;
   done?: boolean;
   toolPhase?: "start" | "end";
@@ -130,7 +137,10 @@ export class Cockpit implements Component {
   #entries: ChatEntry[] = [];
   #openAssistant = false;
   #status: "idle" | "streaming" = "idle";
+  /** The AEP phase the conversation reported (`phase` event) — shown in the header. */
+  #phase: string | undefined;
   #goalContent: string | undefined;
+  #architectureContent: string | undefined;
   #decisionsContent: string | undefined;
 
   constructor(deps: CockpitDeps) {
@@ -153,6 +163,7 @@ export class Cockpit implements Component {
     this.#chatPanel.setChild(this.#chatChild);
 
     this.#refreshArtifact("goal");
+    this.#refreshArtifact("architecture");
     this.#refreshArtifact("decisions");
   }
 
@@ -169,6 +180,13 @@ export class Cockpit implements Component {
   /** Apply one conversation event: update chat / status / artifacts. */
   handle(event: ConversationEvent): void {
     switch (event.type) {
+      case "phase":
+        this.#phase = event.phase;
+        if (event.note) {
+          // e.g. the beyond-registry fallback explanation — surfaced in the log.
+          this.#entries.push({ kind: "info", text: event.note });
+        }
+        break;
       case "user_echo":
         this.#closeAssistant();
         this.#entries.push({ kind: "user", text: event.text });
@@ -271,6 +289,11 @@ export class Cockpit implements Component {
     if (tab === "goal") {
       this.#goalContent = this.#readArtifact("goal");
       this.#goalMarkdown.setText(this.#goalContent ?? "");
+    } else if (tab === "architecture") {
+      // Re-read `product/index.yaml` (same mechanism as the Goal tab's README):
+      // an `artifact_changed{tab:"architecture"}` lands here and the next render
+      // reflects the fresh framing — no restart (SIBYL-016).
+      this.#architectureContent = this.#readArtifact("architecture");
     } else if (tab === "decisions") {
       this.#decisionsContent = this.#readArtifact("decisions");
     }
@@ -313,7 +336,10 @@ export class Cockpit implements Component {
 
   #renderHeader(width: number): string {
     const t = this.#theme;
-    const left = ` ${t.title("SIBYL")} ${t.muted(`· ${this.#project}`)}`;
+    // The AEP phase indicator (SIBYL-016): e.g. `[envision]` when the detected
+    // phase session is envision — asserted by the zero-quota render smokes.
+    const phase = this.#phase ? ` ${t.accent(`[${this.#phase}]`)}` : "";
+    const left = ` ${t.title("SIBYL")} ${t.muted(`· ${this.#project}`)}${phase}`;
     const chip = this.#status === "streaming" ? t.warning("● thinking") : t.muted("○ ready");
     const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(chip) - 1);
     return `${left}${" ".repeat(gap)}${chip} `;
@@ -341,6 +367,19 @@ export class Cockpit implements Component {
         );
       }
       return fitLines(this.#goalMarkdown.render(innerWidth), height);
+    }
+    // The Architecture tab renders the envision output `product/index.yaml`
+    // live (SIBYL-016): a parsed outline of the framing, a preformatted raw
+    // view when the YAML is unparseable, or a themed empty state until the
+    // envision phase submits.
+    if (tab.id === "architecture") {
+      if (!this.#architectureContent || this.#architectureContent.trim().length === 0) {
+        return fitLines(
+          [t.muted(ARCHITECTURE_EMPTY_STATE), "", t.dim("(the envision agent submits it via submit_envision)")],
+          height,
+        );
+      }
+      return fitLines(renderArchitecture(this.#architectureContent, innerWidth, t), height);
     }
     // Once the agent has committed, the Decisions tab renders the captured log
     // (WYSIWYG) instead of the placeholder (SIBYL-011).
@@ -382,12 +421,163 @@ export class Cockpit implements Component {
         const styled = entry.isError ? t.error : t.muted;
         return [styled(truncateToWidth(`  ${glyph} ${entry.text}`, width))];
       }
+      case "info":
+        return wrap(`· ${entry.text}`, width).map((line) => t.muted(line));
       case "error":
         return wrap(`  ✗ ${entry.text}`, width).map((line) => t.error(line));
       default:
         return [];
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Architecture tab: parse-and-outline of `product/index.yaml` (SIBYL-016).
+// ---------------------------------------------------------------------------
+
+/** One backbone activity of the parsed framing (subset the outline shows). */
+interface FramingActivity {
+  readonly name: string;
+  readonly order: number | undefined;
+  readonly layerIntroduced: number | undefined;
+}
+
+/** One release layer of the parsed framing. */
+interface FramingLayer {
+  readonly layer: number | undefined;
+  readonly name: string;
+  readonly userCan: string;
+}
+
+/** The slice of `product/index.yaml` the Architecture outline renders. */
+interface Framing {
+  readonly problem: string | undefined;
+  readonly activities: readonly FramingActivity[];
+  readonly layers: readonly FramingLayer[];
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function asOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Parse the envision artifact text into the outline's {@link Framing} slice.
+ * Returns `undefined` when the text is not YAML or not framing-shaped — the
+ * caller then falls back to a readable preformatted view (never a crash: the
+ * cockpit must render whatever is on disk).
+ */
+function parseFraming(text: string): Framing | undefined {
+  let doc: unknown;
+  try {
+    doc = parseYaml(text);
+  } catch {
+    return undefined;
+  }
+  const product = asObject(asObject(doc)?.product);
+  if (!product) {
+    return undefined;
+  }
+
+  const problem = typeof product.problem === "string" ? product.problem : undefined;
+
+  const activities: FramingActivity[] = (Array.isArray(product.activities) ? product.activities : [])
+    .map((item): FramingActivity | undefined => {
+      const record = asObject(item);
+      if (!record) {
+        return undefined;
+      }
+      const name =
+        typeof record.name === "string" ? record.name : typeof record.id === "string" ? record.id : undefined;
+      if (name === undefined) {
+        return undefined;
+      }
+      return {
+        name,
+        order: asOptionalNumber(record.order),
+        layerIntroduced: asOptionalNumber(record.layer_introduced),
+      };
+    })
+    .filter((item): item is FramingActivity => item !== undefined)
+    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+
+  const layers: FramingLayer[] = (Array.isArray(product.layers) ? product.layers : [])
+    .map((item): FramingLayer | undefined => {
+      const record = asObject(item);
+      if (!record || typeof record.name !== "string") {
+        return undefined;
+      }
+      return {
+        layer: asOptionalNumber(record.layer),
+        name: record.name,
+        userCan: typeof record.user_can === "string" ? record.user_can : "",
+      };
+    })
+    .filter((item): item is FramingLayer => item !== undefined);
+
+  if (problem === undefined && activities.length === 0 && layers.length === 0) {
+    return undefined;
+  }
+  return { problem, activities, layers };
+}
+
+/**
+ * Render the Architecture tab body: a themed OUTLINE of the product framing
+ * (problem one-liner, backbone activities with order + introduction layer,
+ * release layers with what the user can do) when `product/index.yaml` parses,
+ * else the raw text preformatted. Pure lines-in-lines-out — headless-testable.
+ */
+function renderArchitecture(text: string, width: number, t: Theme): string[] {
+  const framing = parseFraming(text);
+  if (!framing) {
+    // Unparseable / unexpected shape: show the file as-is (readable, never a crash).
+    return text
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map((line) => truncateToWidth(line, width));
+  }
+
+  const lines: string[] = [t.title("Product framing"), ""];
+
+  if (framing.problem !== undefined && framing.problem.trim().length > 0) {
+    lines.push(t.accent("Problem"));
+    for (const line of wrap(framing.problem, Math.max(1, width - 2))) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("");
+  }
+
+  if (framing.activities.length > 0) {
+    lines.push(t.accent("Activities (backbone order)"));
+    for (const activity of framing.activities) {
+      const order = activity.order !== undefined ? `${activity.order}.` : "·";
+      const intro = activity.layerIntroduced !== undefined ? ` — introduced L${activity.layerIntroduced}` : "";
+      lines.push(truncateToWidth(`  ${order} ${activity.name}${intro}`, width));
+    }
+    lines.push("");
+  }
+
+  if (framing.layers.length > 0) {
+    lines.push(t.accent("Layers (thinnest first)"));
+    for (const layer of framing.layers) {
+      const tag = layer.layer !== undefined ? `L${layer.layer}` : "L?";
+      const detail = layer.userCan.length > 0 ? ` — user can: ${layer.userCan}` : "";
+      const wrapped = wrap(`${tag} ${layer.name}${detail}`, Math.max(1, width - 2));
+      for (const line of wrapped) {
+        lines.push(`  ${line}`);
+      }
+    }
+  }
+
+  while (lines.length > 0 && lines.at(-1) === "") {
+    lines.pop();
+  }
+  return lines;
 }
 
 /** Word-wrap plain text to `width` without relying on ANSI-aware wrapping. */

@@ -178,3 +178,124 @@ describe("Cockpit — fixed layout, tab framework, chat driver", () => {
     expect(quits).toBe(1);
   });
 });
+
+// ─── SIBYL-016: phase indicator + Architecture tab (envision output) ─────────
+
+import { ARCHITECTURE_EMPTY_STATE } from "../src/renderer/cockpit";
+import { serializeEnvisionYaml } from "../src/engine/submit";
+
+/** A canonical envision artifact, produced by the REAL harness serializer. */
+const FRAMING_YAML = serializeEnvisionYaml({
+  problem: "Solo builders lose the thread between idea and shipped software.",
+  personas: [{ name: "solo-aep-builder", description: "Builds products alone with agents." }],
+  activities: [
+    { id: "frame-product", name: "Frame the product", order: 2, layer_introduced: 1 },
+    { id: "capture-idea", name: "Capture the idea", order: 1, layer_introduced: 0 },
+  ],
+  layers: [
+    { layer: 0, name: "walking skeleton", user_can: "originate a committed README" },
+    { layer: 1, name: "envision", user_can: "frame the product into product/index.yaml" },
+  ],
+  mvp_boundary: { in_scope: ["cockpit"], out_of_scope: ["multiplayer"] },
+});
+
+describe("Cockpit — phase indicator + Architecture tab (SIBYL-016)", () => {
+  it("renders the reported phase in the header (visible phase indicator)", () => {
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal()),
+      theme: createTheme({ color: false }),
+      project: "demo",
+      dispatch: () => {},
+      readArtifact: () => undefined,
+    });
+    expect(cockpit.render(100).join("\n")).not.toContain("[envision]");
+
+    cockpit.handle({ type: "phase", phase: "envision" });
+    const out = cockpit.render(100).join("\n");
+    expect(out).toContain("[envision]");
+
+    // Every line still renders to the exact width with the indicator present.
+    for (const line of cockpit.render(100)) {
+      expect(visibleWidth(line)).toBe(100);
+    }
+  });
+
+  it("surfaces a phase NOTE (beyond-registry fallback) in the chat log", () => {
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal()),
+      theme: createTheme({ color: false }),
+      dispatch: () => {},
+      readArtifact: () => undefined,
+    });
+    cockpit.handle({
+      type: "phase",
+      phase: "envision",
+      note: "Project artifacts are beyond the registered phases — falling back to envision.",
+    });
+    const out = cockpit.render(100).join("\n");
+    expect(out).toContain("beyond the registered phases");
+  });
+
+  it("shows the Architecture empty state until product/index.yaml exists", () => {
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal()),
+      theme: createTheme({ color: false }),
+      dispatch: () => {},
+      readArtifact: (tab) => (tab === "goal" ? README : undefined),
+    });
+    cockpit.handleInput("\t"); // Goal → Story Map
+    cockpit.handleInput("\t"); // Story Map → Architecture
+    expect(cockpit.activeTab.id).toBe("architecture");
+    const out = cockpit.render(100).join("\n");
+    expect(out).toContain("No product/index.yaml yet");
+    expect(out).toContain(ARCHITECTURE_EMPTY_STATE);
+  });
+
+  it("AC2: re-renders the framing (activities + layers) on artifact_changed — no restart", () => {
+    let architecture: string | undefined; // starts absent (pre-submit)
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal(30)),
+      theme: createTheme({ color: false }),
+      dispatch: () => {},
+      readArtifact: (tab) =>
+        tab === "goal" ? README : tab === "architecture" ? architecture : undefined,
+    });
+    cockpit.handleInput("\t");
+    cockpit.handleInput("\t");
+    expect(cockpit.activeTab.id).toBe("architecture");
+    expect(cockpit.render(100).join("\n")).toContain("No product/index.yaml yet");
+
+    // submit_envision completes: the harness wrote+committed the artifact and the
+    // conversation fired artifact_changed{architecture} (hooks + adapter path).
+    architecture = FRAMING_YAML;
+    cockpit.handle({ type: "artifact_changed", tab: "architecture" });
+
+    const out = cockpit.render(100).join("\n");
+    // Problem one-liner.
+    expect(out).toContain("Solo builders lose the thread");
+    // Activities, sorted by backbone order, with their introduction layer.
+    expect(out).toContain("1. Capture the idea — introduced L0");
+    expect(out).toContain("2. Frame the product — introduced L1");
+    expect(out.indexOf("1. Capture the idea")).toBeLessThan(out.indexOf("2. Frame the product"));
+    // Layers with layer number, name, and what the user can do.
+    expect(out).toContain("L0 walking skeleton — user can: originate a committed README");
+    expect(out).toContain("L1 envision");
+    // The empty state is gone.
+    expect(out).not.toContain("No product/index.yaml yet");
+  });
+
+  it("falls back to a readable preformatted view for unparseable YAML (never crashes)", () => {
+    const cockpit = new Cockpit({
+      tui: new TUI(headlessTerminal()),
+      theme: createTheme({ color: false }),
+      dispatch: () => {},
+      readArtifact: (tab) =>
+        tab === "architecture" ? "::: not yaml at all\n\t{unbalanced" : undefined,
+    });
+    cockpit.handle({ type: "artifact_changed", tab: "architecture" });
+    cockpit.handleInput("\t");
+    cockpit.handleInput("\t");
+    const out = cockpit.render(100).join("\n");
+    expect(out).toContain("::: not yaml at all");
+  });
+});
