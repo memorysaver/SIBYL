@@ -8,6 +8,7 @@ import {
   type AgentSession,
   type ExtensionFactory,
   type LoadExtensionsResult,
+  type ResourceDiagnostic,
   type ResourceLoader,
   type Skill,
 } from "@earendil-works/pi-coding-agent";
@@ -44,6 +45,15 @@ export const SIBYL_PERSONA =
  */
 export const SIBYL_BUNDLED_SKILLS_DIR = fileURLToPath(new URL("../../skills", import.meta.url));
 
+/**
+ * The result shape of one skill-discovery pass, as consumed (and produced) by
+ * {@link BootSessionOptions.skillsOverride}. Mirrors the loader's `getSkills()`.
+ */
+export interface DiscoveredSkills {
+  skills: Skill[];
+  diagnostics: ResourceDiagnostic[];
+}
+
 export interface BootSessionOptions {
   /** Global Pi config dir (global skills/extensions). Default: `getAgentDir()` (~/.pi/agent). */
   agentDir?: string;
@@ -66,6 +76,21 @@ export interface BootSessionOptions {
    * SIBYL's own skills (e.g. `sibyl-originate`) resolve regardless of the run cwd.
    */
   additionalSkillPaths?: string[];
+  /**
+   * Optional allowlist of tool names forwarded to `createAgentSession`. When
+   * provided, ONLY these tools are enabled (built-in AND extension/custom tools
+   * alike). Omit to keep Pi's defaults. Used by the AEP flow kernel to narrow a
+   * phase session to exactly its phase's tool allowlist.
+   */
+  tools?: string[];
+  /**
+   * Optional override applied AFTER skill discovery and BEFORE system-prompt
+   * assembly (threads into `DefaultResourceLoader#skillsOverride`). A phase
+   * session uses this to narrow the Agent-Skills block to exactly one bundled
+   * skill — including dropping skills discovered from the user project's git
+   * root. Omit to keep the full discovered set.
+   */
+  skillsOverride?: (base: DiscoveredSkills) => DiscoveredSkills;
 }
 
 export interface BootedSession {
@@ -94,6 +119,8 @@ function createSibylResourceLoader(
     // SIBYL_PERSONA is always first, so every session self-identifies as SIBYL
     // before any flow-specific brief (e.g. the cockpit originate pointer) a caller appends.
     appendSystemPrompt: [SIBYL_PERSONA, ...(options.appendSystemPrompt ?? [])],
+    // Post-discovery narrowing hook (undefined = keep everything discovered).
+    skillsOverride: options.skillsOverride,
   });
 }
 
@@ -116,6 +143,8 @@ export async function bootSession(
     cwd,
     resourceLoader: loader,
     sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
+    // Tool allowlist (only these enabled) when a caller narrows the session.
+    tools: options.tools,
   });
 
   return { session, loader, extensionsResult };
