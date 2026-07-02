@@ -33,7 +33,6 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
-import { COCKPIT_ORIGINATE_POINTER, COCKPIT_TOOLS } from "./conversation";
 import { createSibylEngineExtension } from "./extension";
 import {
   SIBYL_BUNDLED_SKILLS_DIR,
@@ -112,6 +111,26 @@ export interface PhaseSpec<Id extends string = PhaseId> {
    */
   completionToolFactory?: (hooks: PhaseCompletionHooks) => ToolDefinition<any, any, any>;
 }
+
+/**
+ * Tools the originate cockpit agent may use: read-only discovery, real file
+ * authoring (so the Goal/README the user sees is genuinely agent-built), and
+ * git. Owned by the registry (the kernel fixes WHAT the model may touch);
+ * re-exported by the conversation seam for its consumers.
+ */
+export const COCKPIT_TOOLS = ["read", "grep", "find", "ls", "write", "edit", "git"] as const;
+
+/**
+ * The originate-phase ROLE LINE (formerly the "thin pointer" that told the
+ * model to go READ the `sibyl-originate` SKILL.md — the runtime-discovery bet
+ * SIBYL-017 retires). One orienting sentence only: the flow's SUBSTANCE is the
+ * skill's body, compiled into the system prompt via {@link loadPhaseBrief} —
+ * by {@link bootPhaseSession} for a phase session, and by the cockpit's own
+ * boot for the conversation seam.
+ */
+export const COCKPIT_ORIGINATE_POINTER =
+  "You are in SIBYL's ORIGINATE COCKPIT, whose primary view is the project's README (its Goal): " +
+  "conduct the guided sibyl-originate flow, injected in full below, from turn 1.";
 
 /**
  * The envision-phase ROLE LINE. One orienting sentence only: the flow's

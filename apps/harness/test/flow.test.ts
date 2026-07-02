@@ -12,8 +12,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { COCKPIT_TOOLS } from "../src/engine/conversation";
 import {
+  COCKPIT_TOOLS,
   PHASE_REGISTRY,
   type ArtifactProbe,
   type PhaseId,
