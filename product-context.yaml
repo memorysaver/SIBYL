@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 11
+dispatch_epoch: 12
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -828,7 +828,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: in_progress
+    status: completed
     readiness_score: 0.9
     assigned_to: "feat/sibyl-014-submit-envision"
     openspec_change: "SIBYL-014"
@@ -907,10 +907,10 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 3
-    status: pending
+    status: in_progress
     readiness_score: 0.9
-    assigned_to: null
-    openspec_change: null
+    assigned_to: "feat/sibyl-017-brief-injection"
+    openspec_change: "SIBYL-017"
     priority: critical
     business_value: 8
     complexity: S
@@ -1533,3 +1533,15 @@ changelog:
     author: human + agent
     summary: "PATTERN RATIFIED (user): the SIBYL Phase Pattern is THE repeating template for every AEP phase - one PhaseSpec registry entry (entryCondition/brief/allowlists/typed submit), 5 invariants (fresh session, injected brief, guard on, no free-writes, harness-owned lifecycle), exactly 3 variation axes (ladder rung, session locality, artifact target). Formalized in docs/decisions/sibyl-phase-pattern.md; later story specs MUST reference it instead of re-deriving design. L1 = vertical proof for envision; L2-L6 become mostly instantiation."
     sections_changed: ["architecture"]
+
+  - date: 2026-07-02
+    type: story_completed
+    author: agent
+    summary: "SIBYL-014 (submit_envision typed completion) merged @459b1e4: submit.ts 409 lines (createSubmitTool factory + envision schema mirroring split-mode product/index.yaml), flow.ts wiring via PhaseSpec.completionToolFactory + PhaseCompletionHooks (no session.ts change), default decision sink = appendDecision (SIBYL-011 pattern). 157 tests green (+18), tsc clean; one-line title conflict with SIBYL-015 in flow.test.ts resolved at merge. SDK fact: Pi 0.80.2 AgentToolResult has NO isError field - tool errors derive solely from THROWING (createErrorToolResult); semantic rejects must throw, not return isError."
+    sections_changed: ["stories"]
+
+  - date: 2026-07-02
+    type: dispatch
+    author: agent
+    summary: "Dispatch epoch 12 (L1 wave 3): SIBYL-017 (deterministic brief injection per the ratified Phase Pattern) -> feat/sibyl-017-brief-injection; was held back until SIBYL-014 merged (flow.ts overlap)."
+    sections_changed: ["stories"]
