@@ -2,7 +2,7 @@ schema: v1
 project: SIBYL
 version: "0.3.0"
 updated_at: 2026-07-02
-dispatch_epoch: 13
+dispatch_epoch: 14
 
 # ─── SPLIT MODE ──────────────────────────────────────────────────
 # Stable product definition lives in product/index.yaml
@@ -979,6 +979,172 @@ stories:
       integration: ["zero-quota render smoke via shell-use (02.1)"]
       contract: []
 
+  # ── LAYER 2 (Story-map + routing / legibility) — decomposed 2026-07-02 per the ratified Phase Pattern ──
+  # Pattern reference: docs/decisions/sibyl-phase-pattern.md — story specs below deliberately thin;
+  # the template (entryCondition/brief/allowlists/typed submit + invariants) is NOT re-derived here.
+  - id: SIBYL-018
+    title: "Map phase instantiation - registry entry + sibyl-map brief + submit_map (story graph typed completion)"
+    layer: 2
+    module: engine
+    activity: map-journey
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 1
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "feat/sibyl-018-map-phase"
+    openspec_change: "SIBYL-018"
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: []
+    description:
+      what_changes: "Instantiate the Phase Pattern for MAP: (a) registry entry `map` (entryCondition: product/index.yaml present + no product-context.yaml story graph; envision's beyond-registry fallback becomes real routing); (b) apps/harness/skills/sibyl-map/SKILL.md - conduct /aep-map's judgment essence (activities -> story decomposition -> L0 walking skeleton first -> waves/dependencies) in injected-brief voice, completing ONLY via submit_map; (c) submit_map via the existing createSubmitTool factory - schema: stories[] {id,title,layer,activity,dependencies[],description} + waves[] + minimal layer_gates[]; harness serializes a v1-lite product-context.yaml (schema v1, stories status:pending), writes + commits it, fires hooks."
+      why: "First repetition of the ratified pattern - proves L2+ layers are instantiation, not new machinery."
+    acceptance_criteria:
+      - "detectPhase routes a repo with product/index.yaml but no story graph to `map`; the map session carries ONLY the sibyl-map brief (injected body verbatim) + its tool allowlist incl. submit_map."
+      - "submit_map validates (schema + semantic: unique story ids, deps reference existing ids, every story's layer/activity valid) and on success the HARNESS writes + commits a parseable product-context.yaml with all stories status:pending; invalid input throws actionable errors (Pi retry channel)."
+      - "Zero kernel changes beyond the registry entry + schema instance (the pattern's generalization invariant holds on its first real repetition)."
+    interface_obligations:
+      implements: ["map PhaseSpec", "sibyl-map SKILL.md", "submit_map"]
+      consumes: ["flow.ts registry/bootPhaseSession/loadPhaseBrief", "submit.ts createSubmitTool", ".claude/skills/aep-map (content source)"]
+      contract_tests_required: true
+    files_affected:
+      - "apps/harness/src/engine/flow.ts (registry entry only)"
+      - "apps/harness/src/engine/submit.ts (submit_map schema instance)"
+      - "apps/harness/skills/sibyl-map/SKILL.md (new)"
+      - "apps/harness/test/flow.test.ts + test/submit.test.ts (extend)"
+    technical_notes: "Follow SIBYL-014's schema conventions (TypeBox; semantic rejects THROW - AgentToolResult has no isError). The written product-context.yaml is the USER project's operational file (v1-lite: schema/project/stories/waves/layer_gates/changelog stub) - NOT SIBYL's own."
+    verification:
+      unit: ["routing predicate", "schema accept/reject table", "YAML round-trip"]
+      integration: ["map session: raw write blocked, submit_map succeeds in a temp repo"]
+      contract: ["submit_map schema = documented map output contract"]
+
+  - id: SIBYL-019
+    title: "Legibility engine v1 - ProjectModel + ASCII story-map grid (pure library, static-analysis-first)"
+    layer: 2
+    module: legibility
+    activity: map-journey
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 1
+    status: in_progress
+    readiness_score: 0.9
+    assigned_to: "feat/sibyl-019-legibility-v1"
+    openspec_change: "SIBYL-019"
+    priority: critical
+    business_value: 9
+    complexity: M
+    compile_mode: shared_enabler
+    change_group: null
+    dependencies: []
+    description:
+      what_changes: "New pure-library module apps/harness/src/legibility/: (a) extractors - parse product/index.yaml (activities/layers) + product-context.yaml (stories w/ status) via the yaml package into a typed ProjectModel {activities ordered, layers, stories indexed by activity x layer, statuses}; tolerant of missing files (empty model) and partial YAML; (b) renderStoryMapGrid(model, width) - deterministic ASCII/Unicode user-story-map grid: backbone activities as ordered columns, layers as rows, story cells with status glyphs (pending/in-progress/completed/failed) + a legend; fixed-width lines, NO reflow, pure function of the model. USER DIRECTIVE: rendering NEVER depends on model output - static analysis only."
+      why: "The legibility engine is the user's core L2 mandate: align the UI to human cognition (user-story mapping), stability by construction (no LLM in the render path)."
+    acceptance_criteria:
+      - "src/legibility/** imports NEITHER the Pi SDK NOR pi-tui (enforced by a dependency-scan test, same pattern as ADR-001's renderer scan)."
+      - "ProjectModel extraction: given fixture YAMLs -> correct activities/layers/story-cell mapping; missing/partial files -> empty/partial model, never a throw."
+      - "renderStoryMapGrid is deterministic (same model+width -> identical lines), renders every story exactly once in its activity x layer cell with the right status glyph, and stays within the given width."
+    interface_obligations:
+      implements: ["ProjectModel", "extractProjectModel(cwd)", "renderStoryMapGrid(model,width)"]
+      consumes: ["yaml package (pin as a direct apps/harness dependency - gate-1 follow-up)"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/legibility/ (new: model.ts, extract.ts, render.ts)"
+      - "apps/harness/test/legibility.test.ts (new)"
+      - "apps/harness/package.json (pin yaml)"
+    technical_notes: "pi-tui Text renders preformatted multi-line strings without reflow (verified) - the renderer consumes these lines as-is in SIBYL-020. Keep the module renderer-agnostic: the L7 web surface renders the same ProjectModel. Per-story structural/spec delta extractors arrive at L4 - design the model to extend, don't build them now."
+    verification:
+      unit: ["extraction fixtures", "grid determinism + width", "status glyph mapping"]
+      integration: []
+      contract: []
+
+  - id: SIBYL-020
+    title: "Story Map tab renders the legibility grid live + journey 03"
+    layer: 2
+    module: renderer
+    activity: map-journey
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 2
+    status: pending
+    readiness_score: 0.85
+    assigned_to: null
+    openspec_change: null
+    priority: high
+    business_value: 8
+    complexity: M
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-018", "SIBYL-019"]
+    description:
+      what_changes: "The UI CONVERTS to a user-story-mapping interface (L2's user_can): the Story Map tab renders renderStoryMapGrid over the extracted ProjectModel of the cockpit cwd, re-rendering on artifact_changed (submit_map completion + relevant commits), with a themed empty state pre-map. Wire map-phase completion hooks -> decision capture + artifact_changed{storymap} (mirror SIBYL-016's envision wiring). Author journey 03-cockpit-map.md: 03.1 zero-quota smoke (post-envision repo -> [map] phase + Story Map empty state) run at build time; 03.2 live guided map (interview -> submit_map -> grid renders with pending stories; structural verify: product-context.yaml parses, stories all pending, grid shows every story) - 03.2 EXECUTES at THIS layer's milestone gate."
+      why: "Closes the L2 legibility test surface: the 'second person follows unaided' hypothesis is exercised against this tab at the milestone dogfood."
+    acceptance_criteria:
+      - "Post-map temp repo: Story Map tab renders the grid (headless render test with fixture YAMLs; every story visible in its cell); pre-map: empty state."
+      - "submit_map completion re-renders the tab without restart (scripted-double test via the hooks path)."
+      - "Journey 03 authored in the BDD shape; 03.1 passes live via shell-use (zero quota)."
+    interface_obligations:
+      implements: ["Story Map tab render", "map completion wiring", "journeys/03-cockpit-map.md"]
+      consumes: ["legibility (SIBYL-019)", "map phase events (SIBYL-018)", "conversation seam artifact_changed"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/renderer/cockpit.ts"
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/src/main.ts (artifact reader branch)"
+      - "apps/harness/test/cockpit.test.ts + test/conversation.test.ts (extend)"
+      - "skills/e2e-test/journeys/03-cockpit-map.md (new) + journeys/README.md (index)"
+    technical_notes: "Renderer stays SDK-free (legibility is SDK-free by SIBYL-019 AC1, so importing it is safe). Follow SIBYL-016's artifact-reader port pattern in main.ts."
+    verification:
+      unit: ["grid render in tab", "re-render on artifact_changed"]
+      integration: ["zero-quota 03.1 via shell-use"]
+      contract: []
+
+  - id: SIBYL-021
+    title: "Mid-run steering - cockpit input during a turn steers the session (steer/followUp wiring)"
+    layer: 2
+    module: engine
+    activity: map-journey
+    capability: guided-aep-journey-tui
+    calibration_type: null
+    object_model_refs: []
+    slice: 3
+    status: pending
+    readiness_score: 0.85
+    assigned_to: null
+    openspec_change: null
+    priority: high
+    business_value: 7
+    complexity: S
+    compile_mode: single_change
+    change_group: null
+    dependencies: ["SIBYL-020"]
+    description:
+      what_changes: "Retire the L0.5 finding 'cockpit rejects concurrent prompts': input submitted while the agent is streaming routes to session.steer() (queued into the current turn); input after agent_end but pre-idle routes to followUp(). The chat log renders queued steers distinctly (e.g. '(steering) ...'); queue_update events surface state. No more '✗ Agent is already processing a prompt' rejection."
+      why: "SDK-native (steer/followUp/queue_update verified in 0.80.2). Long envision/map interviews at the L2 milestone dogfood need mid-turn course-correction - this is also the determinism ladder's rung-3 transport (programmatic nudges reuse the same path)."
+    acceptance_criteria:
+      - "send during streaming -> session.steer called (scripted double), user_echo rendered as a queued steer, NO rejection error event."
+      - "send while idle behaves exactly as today (prompt)."
+      - "queue_update surfaces in the seam (event mapped) and the chat log shows queued items."
+    interface_obligations:
+      implements: ["steer/followUp routing in the conversation seam", "queued-steer chat rendering"]
+      consumes: ["AgentSession.steer/followUp/queue_update (SDK)", "conversation seam status tracking"]
+      contract_tests_required: false
+    files_affected:
+      - "apps/harness/src/engine/conversation.ts"
+      - "apps/harness/src/renderer/cockpit.ts (queued display)"
+      - "apps/harness/test/conversation.test.ts (extend)"
+    technical_notes: "steer() queues into the CURRENT turn; followUp() after stop; setSteeringMode default is fine for v1. Keep lazy-connect intact."
+    verification:
+      unit: ["routing matrix idle/streaming/post-turn", "no rejection path remains"]
+      integration: ["scripted streaming session accepts a mid-turn send"]
+      contract: []
+
 # ─── WAVES (execution slices within Layer 0) ─────────────────────
 waves:
   - layer: 0
@@ -1017,6 +1183,18 @@ waves:
     wave: 4
     stories: ["SIBYL-016"]
     theme: "Cockpit envision integration (detect-state routing + live render + journey 02)"
+  - layer: 2
+    wave: 1
+    stories: ["SIBYL-018", "SIBYL-019"]
+    theme: "Map phase instantiation + legibility engine v1 (parallel, disjoint files)"
+  - layer: 2
+    wave: 2
+    stories: ["SIBYL-020"]
+    theme: "Story Map tab renders the grid + journey 03"
+  - layer: 2
+    wave: 3
+    stories: ["SIBYL-021"]
+    theme: "Mid-run steering (steer/followUp wiring)"
 
 # ─── TOPOLOGY ────────────────────────────────────────────────────
 topology:
@@ -1190,6 +1368,25 @@ layer_gates:
       tests_failed: 0
       failures: []
     completed_at: 2026-07-02
+
+  - layer: 2
+    status: pending
+    # MILESTONE GATE (dogfood live_policy): the first LIVE Codex dogfood since L0.5 runs here.
+    test_definition: "In a post-envision repo, the cockpit routes to the MAP phase; a guided conversation forges the story graph via submit_map (harness writes + commits a v1-lite product-context.yaml, stories pending); the Story Map tab CONVERTS to a user-story-mapping grid (activities x layers, status glyphs) rendered by the legibility engine (static analysis only) and re-renders live; mid-turn input steers instead of being rejected. The 'second person follows unaided' hypothesis is exercised in the live dogfood."
+    journeys:
+      - skills/e2e-test/journeys/02-cockpit-envision.md # 02.2 LIVE half (deferred from the L1 gate) EXECUTES here
+      - skills/e2e-test/journeys/03-cockpit-map.md # authored by SIBYL-020; 03.1 zero-quota at build, 03.2 LIVE here
+      - skills/e2e-test/journeys/01-cockpit-guided-originate.md # regression render half
+    coverage:
+      criteria_total: 12 # 018(3) + 019(3) + 020(3) + 021(3)
+      criteria_covered: 0
+      uncovered: ["all - layer not started"]
+    evidence:
+      scripted: null
+      journeys: []
+      matrix: docs/layer-gates/2.md
+    results: null
+    completed_at: null
 
 # ─── COST ────────────────────────────────────────────────────────
 cost:
@@ -1577,3 +1774,15 @@ changelog:
     author: agent
     summary: "LAYER 1 GATE PASSED (full_auto judgment): 16/16 criteria across 5 stories; Tier-1 178 tests green; Tier-2 zero-quota journeys live via shell-use (02.1 envision smoke + 01 originate regression + incidental beyond-registry fallback proof). Journey 02.2 live half deferred by policy to the L2 milestone gate. Evidence: docs/layer-gates/1.md. L1 = the vertical proof of the SIBYL Phase Pattern; advance to L2 (Story-map + routing / legibility)."
     sections_changed: ["layer_gates"]
+
+  - date: 2026-07-02
+    type: map_update
+    author: agent
+    summary: "L2 (Story-map + routing / legibility) decomposed per the ratified Phase Pattern - specs deliberately thin, referencing docs/decisions/sibyl-phase-pattern.md: SIBYL-018 map phase instantiation (registry + sibyl-map brief + submit_map), SIBYL-019 legibility engine v1 (ProjectModel + ASCII story-map grid, pure library, SDK/pi-tui-free), SIBYL-020 Story Map tab + journey 03, SIBYL-021 mid-run steering (retires the L0.5 concurrent-prompt finding). Gate 2 defined = FIRST MILESTONE LIVE DOGFOOD (02.2 + 03.2 + regression 01)."
+    sections_changed: ["stories", "waves", "layer_gates"]
+
+  - date: 2026-07-02
+    type: dispatch
+    author: agent
+    summary: "Dispatch epoch 14 (L2 wave 1, parallel): SIBYL-018 -> feat/sibyl-018-map-phase and SIBYL-019 -> feat/sibyl-019-legibility-v1 (disjoint files) to worktree subagents."
+    sections_changed: ["stories"]
