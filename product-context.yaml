@@ -868,7 +868,7 @@ stories:
     calibration_type: null
     object_model_refs: []
     slice: 2
-    status: in_progress
+    status: completed
     readiness_score: 0.85
     assigned_to: "feat/sibyl-015-envision-skill"
     openspec_change: "SIBYL-015"
@@ -1521,3 +1521,9 @@ changelog:
     author: human + agent
     summary: "scope-direction refinement #2 (user): reviewed the AEP skills' design - they interleave PROCEDURE (prose state machines, e.g. aep-build's 13 phases) with JUDGMENT (interviews/heuristics); instability comes from the model executing the procedure. Decision (docs/decisions/aep-conduct-mechanisms.md): procedure -> TypeScript kernel; judgment -> prompt-COMPILED briefs injected via appendSystemPrompt (md files stay as the authoring format; runtime skill discovery never load-bearing, skillsOverride kept as leak defense); determinism ladder (brief -> typed completion -> steer nudges -> scripted micro-turns). Story workers (L4/L6) = independent OS processes, tmux/claude-bg style, cockpit can ATTACH + steer - SIBYL implements its own Pi-native executor rather than AEP's host-CLI backend matrix. New SIBYL-017 (brief injection) inserted as L1 wave 3; SIBYL-016 -> wave 4, now depends on 017. In-flight review: SIBYL-014 unaffected (it IS ladder rung 2); SIBYL-015 steered mid-flight to write the body in injected-brief voice."
     sections_changed: ["architecture", "stories", "waves", "layer_gates"]
+
+  - date: 2026-07-02
+    type: story_completed
+    author: agent
+    summary: "SIBYL-015 (sibyl-envision bundled skill) merged @9d2741c: 73-line conductor brief in INJECTED-BRIEF voice (mid-flight steer applied - no self-referential skill framing), 139 tests green (+4: cwd-independent discovery, prompt surfacing, envision-session narrows to EXACTLY sibyl-envision incl. a planted user-decoy skill excluded, content invariants incl. complete-ONLY-via-submit_envision). SIBYL-014 still in flight."
+    sections_changed: ["stories"]
